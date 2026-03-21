@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic RAG — Microsoft Agent Framework (.NET)</title>
+    <style>
+        :root {
+            --primary: #0078d4;
+            --primary-dark: #005a9e;
+            --accent: #00b7c3;
+            --bg: #f9fafb;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --code-bg: #1e1e2e;
+            --code-text: #cdd6f4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --kw: #cba6f7; --fn: #89b4fa; --str: #a6e3a1; --num: #fab387;
+            --cmt: #6c7086; --cls: #f9e2af; --op: #89dceb; --dec: #f38ba8;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+        /* ── Hero ─────────────────── */
+        .hero { background: linear-gradient(135deg, #0078d4 0%, #00b7c3 50%, #50e6ff 100%); color: white; padding: 80px 40px; text-align: center; position: relative; overflow: hidden; }
+        .hero::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px); background-size: 40px 40px; }
+        .hero h1 { font-size: 3rem; font-weight: 700; position: relative; margin-bottom: 12px; }
+        .hero .sub { font-size: 1.25rem; opacity: .92; position: relative; max-width: 820px; margin: 0 auto; }
+        .hero .badges { margin-top: 24px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; position: relative; }
+        .hero .badge { background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.35); border-radius: 20px; padding: 6px 18px; font-size: .85rem; backdrop-filter: blur(4px); }
+
+        /* ── Nav ──────────────────── */
+        .toc { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 14px 40px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .toc-inner { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px; }
+        .toc a { color: var(--primary); text-decoration: none; font-size: .8rem; padding: 4px 12px; border-radius: 16px; transition: all .2s; border: 1px solid transparent; }
+        .toc a:hover { background: #e8f4fd; border-color: var(--primary); }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+        section { margin-bottom: 56px; }
+        section > h2 { font-size: 1.85rem; color: var(--primary-dark); border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 24px; }
+        h3, .sub-h3 { font-size: 1.3rem; color: var(--text); margin: 28px 0 12px; padding-left: 12px; border-left: 4px solid var(--accent); }
+        h4 { font-size: 1.05rem; margin: 18px 0 8px; color: var(--primary-dark); }
+        p { margin-bottom: 14px; }
+        ul, ol { margin: 0 0 14px 24px; }
+        li { margin-bottom: 6px; }
+
+        /* ── Cards ────────────────── */
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; margin: 20px 0; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: box-shadow .2s, transform .2s; }
+        .card:hover { box-shadow: 0 8px 24px rgba(0,120,212,.1); transform: translateY(-2px); }
+        .card .icon { font-size: 2rem; margin-bottom: 12px; }
+        .card h4 { margin: 0 0 8px; color: var(--primary); }
+        .card p { font-size: .92rem; color: var(--text-muted); margin: 0; }
+
+        /* ── Tables ───────────────── */
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: .92rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+        thead { background: var(--primary); color: white; }
+        th { padding: 12px 16px; text-align: left; font-weight: 600; }
+        td { padding: 10px 16px; border-top: 1px solid var(--border); }
+        tr:nth-child(even) { background: #f8fafc; }
+
+        /* ── Code ─────────────────── */
+        pre { background: var(--code-bg); color: var(--code-text); padding: 20px 24px; border-radius: 10px; overflow-x: auto; font-size: .84rem; line-height: 1.6; margin: 16px 0; position: relative; }
+        pre .lang { position: absolute; top: 8px; right: 12px; font-size: .7rem; color: var(--fn); text-transform: uppercase; letter-spacing: 1px; }
+        code { font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; }
+        :not(pre) > code { background: #e8f0fe; color: #1a56db; padding: 2px 7px; border-radius: 4px; font-size: .88em; }
+        .kw { color: var(--kw); } .fn { color: var(--fn); } .str { color: var(--str); } .num { color: var(--num); }
+        .cmt { color: var(--cmt); font-style: italic; } .cls { color: var(--cls); } .op { color: var(--op); } .dec { color: var(--dec); }
+
+        /* ── Callout ──────────────── */
+        .callout { border-left: 4px solid; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: .92rem; }
+        .callout-info { border-color: var(--info); background: #eff6ff; }
+        .callout-success { border-color: var(--success); background: #ecfdf5; }
+        .callout-warning { border-color: var(--warning); background: #fffbeb; }
+        .callout-danger { border-color: var(--danger); background: #fef2f2; }
+        .callout strong { display: block; margin-bottom: 4px; }
+
+        /* ── Flow diagrams ────────── */
+        .flow { background: #f1f5f9; border: 1px solid var(--border); border-radius: 10px; padding: 24px; text-align: center; margin: 20px 0; overflow-x: auto; }
+        .flow pre { background: transparent; color: var(--text); text-align: left; display: inline-block; font-size: .82rem; }
+
+        /* ── Pillar grid ──────────── */
+        .pillar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin: 20px 0; }
+        .pillar { background: linear-gradient(135deg, #f8fafc, #e8f4fd); border: 2px solid var(--primary); border-radius: 12px; padding: 24px; text-align: center; }
+        .pillar .num { background: var(--primary); color: white; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; }
+        .pillar h4 { margin: 0 0 8px; color: var(--primary-dark); }
+        .pillar p { font-size: .88rem; color: var(--text-muted); margin: 0; }
+
+        /* ── Compare ──────────────── */
+        .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 20px 0; }
+        .compare-box { border-radius: 12px; padding: 24px; border: 2px solid; }
+        .compare-box.old { border-color: var(--danger); background: #fef2f2; }
+        .compare-box.new { border-color: var(--success); background: #ecfdf5; }
+        .compare-box h4 { margin-bottom: 12px; }
+        .compare-box ul { padding-left: 20px; }
+
+        /* ── Timeline ─────────────── */
+        .timeline { position: relative; padding-left: 40px; margin: 24px 0; }
+        .timeline::before { content:''; position: absolute; left: 16px; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, var(--primary), var(--accent)); border-radius: 2px; }
+        .tl-step { position: relative; margin-bottom: 28px; }
+        .tl-step::before { content: attr(data-step); position: absolute; left: -40px; top: 0; width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; }
+        .tl-step h4 { margin: 0 0 6px; }
+        .tl-step p { font-size: .9rem; margin: 0; color: var(--text-muted); }
+
+        /* ── File tree ────────────── */
+        .file-tree { background: var(--code-bg); color: var(--code-text); padding: 20px 24px; border-radius: 10px; font-family: 'Cascadia Code', monospace; font-size: .83rem; line-height: 1.8; margin: 16px 0; }
+        .file-tree .folder { color: #89b4fa; } .file-tree .file { color: #a6e3a1; } .file-tree .hl { color: #f9e2af; }
+
+        footer { background: #1e293b; color: #94a3b8; text-align: center; padding: 30px; font-size: .85rem; }
+        footer a { color: var(--accent); text-decoration: none; }
+        @media (max-width: 768px) { .hero h1 { font-size: 2rem; } .compare { grid-template-columns: 1fr; } .hero { padding: 48px 20px; } .container { padding: 24px 16px; } }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<header class="hero">
+    <h1>Agentic RAG System (.NET)</h1>
+    <p class="sub">
+        A production-grade Retrieval-Augmented Generation system built entirely on the
+        <strong>Microsoft Agent Framework for .NET</strong> &amp; <strong>Azure AI Foundry</strong> —
+        featuring Memory, Planning, Reasoning, Caching, multi-source data extraction, and internet search.
+        <em>100% .NET — No Python or Semantic Kernel required.</em>
+    </p>
+    <div class="badges">
+        <span class="badge">Microsoft Agent Framework (.NET)</span>
+        <span class="badge">Azure AI Foundry</span>
+        <span class="badge">.NET 8</span>
+        <span class="badge">Azure OpenAI GPT-4o</span>
+        <span class="badge">Azure AI Search</span>
+        <span class="badge">Document Intelligence</span>
+        <span class="badge">SQL Server</span>
+        <span class="badge">WebSearchPreviewTool</span>
+        <span class="badge">Agent Memory</span>
+        <span class="badge">Redis Semantic Cache</span>
+    </div>
+</header>
+
+<!-- ═══════════════ NAV ══════════════════ -->
+<nav class="toc">
+    <div class="toc-inner">
+        <a href="#overview">Overview</a>
+        <a href="#why-agent-framework">Why Agent Framework (.NET)</a>
+        <a href="#four-pillars">4 Pillars</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#azure-services">Azure Services</a>
+        <a href="#agent-framework">Agent Framework Deep Dive (.NET)</a>
+        <a href="#tools-catalog">Tools Catalog</a>
+        <a href="#project-structure">Project Structure (.NET)</a>
+        <a href="#implementation">Implementation (.NET)</a>
+        <a href="#memory">Memory</a>
+        <a href="#planning">Planning</a>
+        <a href="#reasoning">Reasoning</a>
+        <a href="#caching">Caching</a>
+        <a href="#custom-tools">Custom Tools</a>
+        <a href="#orchestrator">Orchestrator</a>
+        <a href="#hosting">Hosting &amp; API</a>
+        <a href="#ingestion">Data Ingestion</a>
+        <a href="#walkthrough">Walkthrough</a>
+        <a href="#deploy">Deployment</a>
+        <a href="#security">Security</a>
+    </div>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. OVERVIEW ══════════════════ -->
+<section id="overview">
+    <h2>1. Overview</h2>
+    <p>
+        This guide describes how to build a complete <strong>Agentic RAG</strong> system using the
+        <strong>Microsoft Agent Framework for .NET</strong> on Azure AI Foundry. Unlike classic RAG approaches that require manual orchestration and plugin wiring, the Agent Framework for .NET provides:
+        <ul>
+            <li>Built-in tools for Azure AI Search, web search, memory, and file search</li>
+            <li>Graph-based multi-agent workflows for planning and reasoning</li>
+            <li>First-class .NET SDKs and C# support</li>
+            <li>Production-ready hosting and deployment on Azure</li>
+        </ul>
+        <strong>No Python or Semantic Kernel required — this is a pure .NET solution.</strong>
+    </p>
+
+    <h3>Requirements</h3>
+    <table>
+        <thead><tr><th>#</th><th>Requirement</th><th>Agent Framework (.NET) Solution</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td>Agentic RAG on Azure</td><td>Agent Framework multi-agent workflow (Planner → Executor → Reflection loop)</td></tr>
+            <tr><td>2</td><td>Extract data from Images, PDFs, SQL Server</td><td>Custom .NET FunctionTool for Document Intelligence &amp; SQL Server</td></tr>
+            <tr><td>3</td><td>Internet search when needed</td><td>Built-in WebSearchPreviewTool (no Bing resource needed)</td></tr>
+            <tr><td>4</td><td>Semantic caching for similar questions</td><td>Redis Enterprise + HNSW vector index (custom .NET cache layer)</td></tr>
+            <tr><td>5</td><td>Memory (memorising)</td><td>Built-in Agent Memory (managed long-term memory store)</td></tr>
+            <tr><td>6</td><td>Planning</td><td>Multi-agent workflow graph — dedicated Planner agent node</td></tr>
+            <tr><td>7</td><td>Reasoning</td><td>Multi-agent workflow graph — dedicated Reflection agent node with loop-back</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════ 2. WHY AGENT FRAMEWORK ══════════════════ -->
+<section id="why-agent-framework">
+    <h2>2. Why Microsoft Agent Framework for .NET?</h2>
+
+    <div class="compare">
+        <div class="compare-box old">
+            <h4>Classic RAG on Azure (.NET)</h4>
+            <ul>
+                <li>Manual orchestration with controllers/services</li>
+                <li>Custom code for Azure AI Search, OpenAI, and SQL integration</li>
+                <li>Manual web search integration (Bing API, etc.)</li>
+                <li>Custom memory and caching logic</li>
+                <li>Hand-built orchestrator loop (Plan → Execute → Reflect)</li>
+                <li>Manual conversation history management</li>
+                <li>Custom Dockerfile + deployment plumbing</li>
+                <li>No built-in evaluation or tracing</li>
+            </ul>
+        </div>
+        <div class="compare-box new">
+            <h4>Microsoft Agent Framework for .NET</h4>
+            <ul>
+                <li>Built-in <code>AzureAISearchAgentTool</code> — just provide index name</li>
+                <li>Built-in <code>WebSearchPreviewTool</code> — zero setup</li>
+                <li>Built-in <strong>Agent Memory</strong> — managed vector memory store</li>
+                <li>Built-in <code>FileSearchTool</code> for uploaded documents</li>
+                <li><code>FunctionTool</code> for custom tools (type-safe, auto-invoked, C# delegates)</li>
+                <li>Graph-based <code>WorkflowBuilder</code> for multi-agent patterns</li>
+                <li>Hosting adapter → instant HTTP server + Foundry deployment</li>
+                <li>Built-in batch evaluation, tracing, prompt optimization</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>What Agent Framework for .NET Replaces</h3>
+    <table>
+        <thead><tr><th>Capability</th><th>Classic RAG (.NET) Code (removed)</th><th>Agent Framework (.NET) Replacement</th></tr></thead>
+        <tbody>
+            <tr><td>Azure AI Search</td><td>Custom <code>AzureSearchService.cs</code> (50+ lines)</td><td><code>AzureAISearchAgentTool</code> — 3 lines of config</td></tr>
+            <tr><td>Web Search</td><td>Custom <code>WebSearchService.cs</code> + Bing API key</td><td><code>WebSearchPreviewTool()</code> — no API key needed</td></tr>
+            <tr><td>Long-term Memory</td><td>Custom <code>LongTermMemory.cs</code> (100+ lines)</td><td>Built-in <code>AgentMemory</code> + managed memory store</td></tr>
+            <tr><td>Short-term Memory</td><td>Custom <code>ShortTermMemory.cs</code></td><td>Agent Framework conversation threads (managed)</td></tr>
+            <tr><td>Tool Registration</td><td><code>RagToolsPlugin.cs</code> with custom delegates</td><td><code>FunctionTool</code> (C# delegates)</td></tr>
+            <tr><td>Orchestration</td><td>Custom <code>AgenticRagOrchestrator.cs</code> (200+ lines)</td><td><code>WorkflowBuilder</code> graph with edges</td></tr>
+            <tr><td>HTTP Server</td><td>Manual ASP.NET Minimal API</td><td>Agent Framework hosting adapter — one line</td></tr>
+            <tr><td>Deployment</td><td>Manual Dockerfile + Azure setup</td><td>Foundry hosted agent with <code>agent.yaml</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-success">
+        <strong>Result:</strong> ~70% less custom code. You only write custom <code>FunctionTool</code> wrappers for
+        Document Intelligence and SQL Server (since those are custom data sources), plus the Redis semantic cache layer — all in C#.
+    </div>
+</section>
+
+<!-- ═══════════════ 3. FOUR PILLARS ══════════════════ -->
+<section id="four-pillars">
+    <h2>3. The Four Agentic Pillars</h2>
+    <div class="pillar-grid">
+        <div class="pillar">
+            <div class="num">1</div>
+            <h4>🧠 Memory</h4>
+            <p><strong>Built-in Agent Memory</strong>: Managed long-term memory store with vector embeddings.
+            Chat summary + user profile across sessions. Plus conversation threads for short-term context.</p>
+        </div>
+        <div class="pillar">
+            <div class="num">2</div>
+            <h4>📋 Planning</h4>
+            <p><strong>Planner Agent</strong> in the workflow graph decomposes queries into sub-tasks with tool assignments.
+            Uses GPT-4o with structured JSON output.</p>
+        </div>
+        <div class="pillar">
+            <div class="num">3</div>
+            <h4>🔍 Reasoning</h4>
+            <p><strong>Reflection Agent</strong> evaluates evidence completeness, assigns confidence scores,
+            identifies gaps, and triggers re-planning. Loop-back edge in the workflow graph (max 2×).</p>
+        </div>
+        <div class="pillar">
+            <div class="num">4</div>
+            <h4>⚡ Caching</h4>
+            <p><strong>Redis Enterprise</strong> with HNSW vector index. Cosine similarity ≥ 0.92 = cache hit.
+            Sub-100ms response for similar questions.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 4. ARCHITECTURE ══════════════════ -->
+<section id="architecture">
+    <h2>4. System Architecture</h2>
+    <div class="flow">
+<pre>
+   ┌──────────────────────────────────────────────────────────────────────────────┐
+   │              AGENTIC RAG — Microsoft Agent Framework                        │
+   │                                                                              │
+   │   User Question                                                              │
+   │        │                                                                     │
+   │        ▼                                                                     │
+   │   ┌──────────────────────┐                                                   │
+   │   │   SEMANTIC CACHE     │── Hit (cosine ≥ 0.92) ──► Return Cached Answer   │
+   │   │   (Redis + HNSW)     │                                                   │
+   │   └──────────┬───────────┘                                                   │
+   │              │ Miss                                                           │
+   │              ▼                                                                │
+   │   ┌──────────────────────────────────────────────────────────────┐           │
+   │   │             AGENT FRAMEWORK WORKFLOW GRAPH                    │           │
+   │   │                                                              │           │
+   │   │  ┌──────────┐    ┌─────────────┐    ┌──────────────────┐    │           │
+   │   │  │ PLANNER  │───►│  EXECUTOR   │───►│   REFLECTION     │    │           │
+   │   │  │ Agent    │    │  Agent      │    │   Agent          │    │           │
+   │   │  │          │    │             │    │                  │    │           │
+   │   │  │ Decompose│    │ Built-in:   │    │ • Confidence     │    │           │
+   │   │  │ query →  │    │ • AI Search │    │   score (0-1)    │    │           │
+   │   │  │ sub-tasks│    │ • WebSearch │    │ • Gap analysis   │    │           │
+   │   │  │ + tools  │    │ • Memory    │    │ • Re-plan if     │    │           │
+   │   │  └──────────┘    │             │    │   &lt; 0.8 ────────┼──► Loop back  │
+   │   │       ▲          │ Custom:     │    │ • Final answer   │    │ to Planner│
+   │   │       │          │ • DocIntel  │    │   if ≥ 0.8       │    │ (max 2×)  │
+   │   │       │          │ • SQL Server│    └──────────────────┘    │           │
+   │   │       │          └─────────────┘                            │           │
+   │   │       └─────────────────────────────────────────────────────┘           │
+   │   │                                                                          │
+   │   └──────────────────────────────────────────────────────────────┘           │
+   │              │                                                                │
+   │              ▼                                                                │
+   │   ┌──────────────────────────────────────────────────┐                       │
+   │   │  SAVE: Cache answer in Redis + Store in Memory   │                       │
+   │   └──────────────────────────────────────────────────┘                       │
+   │                                                                              │
+   │   Hosting: from_agent_framework(agent).run_async()  ← HTTP on port 8088     │
+   └──────────────────────────────────────────────────────────────────────────────┘
+</pre>
+    </div>
+</section>
+
+<!-- ═══════════════ 5. AZURE SERVICES ══════════════════ -->
+<section id="azure-services">
+    <h2>5. Azure Services</h2>
+    <table>
+        <thead><tr><th>Capability</th><th>Service</th><th>Agent Framework Integration</th></tr></thead>
+        <tbody>
+            <tr><td>LLM (Chat + Planning + Reflection)</td><td>Azure OpenAI — GPT-4o</td><td><code>AzureAIClient</code> → <code>.as_agent()</code></td></tr>
+            <tr><td>Embeddings</td><td>Azure OpenAI — text-embedding-3-large</td><td>Used by AI Search, Memory, and Redis cache</td></tr>
+            <tr><td>Vector + Keyword Search</td><td>Azure AI Search</td><td><code>AzureAISearchAgentTool</code> — built-in, hybrid query</td></tr>
+            <tr><td>Web Search</td><td>Grounding with Bing (managed)</td><td><code>WebSearchPreviewTool</code> — no separate Bing resource needed</td></tr>
+            <tr><td>Long-term Memory</td><td>Foundry Memory Store</td><td>Built-in Agent Memory — chat summary + user profile</td></tr>
+            <tr><td>PDF &amp; Image Extraction</td><td>Azure Document Intelligence</td><td><code>FunctionTool</code> — custom wrapper (prebuilt-layout)</td></tr>
+            <tr><td>Structured Data</td><td>SQL Server</td><td><code>FunctionTool</code> — custom wrapper (read-only SELECT)</td></tr>
+            <tr><td>Semantic Cache</td><td>Azure Cache for Redis (Enterprise)</td><td>Custom cache layer with HNSW vector index</td></tr>
+            <tr><td>Hosting</td><td>Azure AI Foundry (Hosted Agent)</td><td><code>from_agent_framework</code> adapter → Docker → ACR → Foundry</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════ 6. AGENT FRAMEWORK DEEP DIVE ══════════════════ -->
+<section id="agent-framework">
+    <h2>6. Microsoft Agent Framework — Deep Dive</h2>
+
+    <h3>What Is It?</h3>
+    <p>
+        The <strong>Microsoft Agent Framework</strong> is an open-source SDK (<a href="https://github.com/microsoft/agent-framework">github.com/microsoft/agent-framework</a>)
+        for building AI agents that deploy to <strong>Azure AI Foundry</strong>. It provides:
+    </p>
+    <ul>
+        <li><strong>Agent lifecycle</strong> — Create, configure, and manage agents with tools</li>
+        <li><strong>Built-in tool catalog</strong> — AI Search, Web Search, Code Interpreter, File Search, Memory, Function Calling</li>
+        <li><strong>Workflow engine</strong> — Graph-based multi-agent orchestration with edges, loops, and fan-out</li>
+        <li><strong>Hosting adapter</strong> — One-line HTTP server for local dev and Foundry deployment</li>
+        <li><strong>Observability</strong> — Tracing via App Insights, batch evaluation, prompt optimization</li>
+    </ul>
+
+    <h3>SDK Packages</h3>
+    <table>
+        <thead><tr><th>Package</th><th>Version (pinned)</th><th>Purpose</th></tr></thead>
+        <tbody>
+            <tr><td><code>agent-framework-azure-ai</code></td><td>1.0.0rc3</td><td>AzureAIClient, agent creation, tool integration</td></tr>
+            <tr><td><code>agent-framework-core</code></td><td>1.0.0rc3</td><td>Core abstractions, Message, WorkflowBuilder</td></tr>
+            <tr><td><code>azure-ai-agentserver-agentframework</code></td><td>1.0.0b16</td><td>Hosting adapter (HTTP server for Foundry)</td></tr>
+            <tr><td><code>azure-ai-agentserver-core</code></td><td>1.0.0b16</td><td>Core hosting adapter abstractions</td></tr>
+            <tr><td><code>azure-ai-projects</code></td><td>latest pre</td><td>Foundry project client, connections, memory stores</td></tr>
+            <tr><td><code>azure-identity</code></td><td>latest</td><td>DefaultAzureCredential (async)</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-warning">
+        <strong>SDK Version Pinning:</strong> The SDK is in preview with frequent breaking changes. Always pin versions explicitly.
+        Use <code>azure.identity.aio.DefaultAzureCredential</code> (async version) for local dev.
+    </div>
+
+    <h3>Agent Types</h3>
+    <table>
+        <thead><tr><th>Type</th><th>Kind</th><th>Description</th><th>Our Usage</th></tr></thead>
+        <tbody>
+            <tr><td>Prompt Agent</td><td><code>"prompt"</code></td><td>LLM-based, backed by a model deployment. Simple config, no container.</td><td>Could use for simple Q&amp;A — but we need custom code.</td></tr>
+            <tr><td>Hosted Agent</td><td><code>"hosted"</code></td><td>Container-based, running custom code. Full control over logic.</td><td><strong>Our choice</strong> — we need custom tools (DocIntel, SQL) + Redis cache + workflow.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Key Patterns</h3>
+<pre><span class="lang">Python</span>
+<code><span class="cmt"># Agent creation pattern (pinned SDK)</span>
+<span class="kw">from</span> agent_framework.azure <span class="kw">import</span> AzureAIClient
+<span class="kw">from</span> azure.identity.aio <span class="kw">import</span> DefaultAzureCredential  <span class="cmt"># MUST use aio (async)</span>
+
+credential = DefaultAzureCredential()
+
+<span class="cmt"># Each agent needs its OWN client instance</span>
+<span class="kw">async with</span> AzureAIClient(
+    project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+    model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+    credential=credential,
+).<span class="fn">as_agent</span>(
+    name=<span class="str">"MyAgent"</span>,
+    instructions=<span class="str">"You are a helpful RAG assistant."</span>
+) <span class="kw">as</span> agent:
+    <span class="cmt"># Streaming response</span>
+    stream = agent.<span class="fn">run</span>(<span class="str">"What is our Q3 revenue?"</span>, stream=<span class="kw">True</span>)
+    <span class="kw">async for</span> chunk <span class="kw">in</span> stream:
+        <span class="kw">if</span> chunk.text:
+            <span class="fn">print</span>(chunk.text, end=<span class="str">""</span>)
+    <span class="kw">await</span> stream.<span class="fn">get_final_response</span>()  <span class="cmt"># finalize</span>
+</code></pre>
+
+<pre><span class="lang">Python</span>
+<code><span class="cmt"># Hosting adapter — turns agent into HTTP server on port 8088</span>
+<span class="kw">from</span> azure.ai.agentserver.agentframework <span class="kw">import</span> from_agent_framework
+
+<span class="kw">await</span> <span class="fn">from_agent_framework</span>(agent).<span class="fn">run_async</span>()
+<span class="cmt"># Serves OpenAI Responses API on http://localhost:8088</span>
+</code></pre>
+</section>
+
+<!-- ═══════════════ 7. TOOLS CATALOG ══════════════════ -->
+<section id="tools-catalog">
+    <h2>7. Built-In vs Custom Tools</h2>
+    <div class="card-grid">
+        <div class="card">
+            <div class="icon">🔍</div>
+            <h4>AzureAISearchAgentTool</h4>
+            <p><strong>Built-in.</strong> Connects to Azure AI Search index. Supports hybrid (vector + keyword + semantic)
+            queries. Just provide connection ID + index name. Returns results with citations.</p>
+        </div>
+        <div class="card">
+            <div class="icon">🌐</div>
+            <h4>WebSearchPreviewTool</h4>
+            <p><strong>Built-in.</strong> Real-time web search with citations. Zero setup — no Bing resource
+            or API key needed. Configurable location and context size.</p>
+        </div>
+        <div class="card">
+            <div class="icon">🧠</div>
+            <h4>Agent Memory</h4>
+            <p><strong>Built-in.</strong> Managed long-term memory store with chat summaries and user profiles.
+            Automatic embedding. Persists across sessions and devices.</p>
+        </div>
+        <div class="card">
+            <div class="icon">📄</div>
+            <h4>FileSearchTool</h4>
+            <p><strong>Built-in.</strong> Semantic + keyword search over uploaded files (PDF, DOCX, etc.)
+            via vector stores. Auto-indexes uploaded content.</p>
+        </div>
+        <div class="card">
+            <div class="icon">🏗️</div>
+            <h4>FunctionTool (Document Intelligence)</h4>
+            <p><strong>Custom.</strong> Wraps Azure Document Intelligence for OCR, layout analysis, and
+            table extraction from PDFs and images. Uses prebuilt-layout model.</p>
+        </div>
+        <div class="card">
+            <div class="icon">🗄️</div>
+            <h4>FunctionTool (SQL Server)</h4>
+            <p><strong>Custom.</strong> Read-only SELECT queries against SQL Server. Keyword blocklist
+            prevents write/DDL operations. Results limited to 100 rows.</p>
+        </div>
+    </div>
+
+    <table>
+        <thead><tr><th>Tool</th><th>Type</th><th>Setup Required</th><th>Custom Code?</th></tr></thead>
+        <tbody>
+            <tr><td><code>AzureAISearchAgentTool</code></td><td>Built-in</td><td>Project connection + RBAC</td><td>No — 3 lines config</td></tr>
+            <tr><td><code>WebSearchPreviewTool</code></td><td>Built-in</td><td>None</td><td>No — zero config</td></tr>
+            <tr><td>Agent Memory</td><td>Built-in</td><td>Memory store + embedding model</td><td>No — managed service</td></tr>
+            <tr><td><code>FileSearchTool</code></td><td>Built-in</td><td>Vector store creation</td><td>No</td></tr>
+            <tr><td>Document Intelligence</td><td><code>FunctionTool</code></td><td>DocIntel resource</td><td>Yes — ~40 lines</td></tr>
+            <tr><td>SQL Server</td><td><code>FunctionTool</code></td><td>SQL connection string</td><td>Yes — ~35 lines</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════ 8. PROJECT STRUCTURE ══════════════════ -->
+<section id="project-structure">
+    <h2>8. Project Structure</h2>
+    <div class="file-tree">
+<span class="folder">agentic-rag/</span>
+├── <span class="file">app.py</span>                          ← Main entrypoint (agent creation + hosting adapter)
+├── <span class="file">requirements.txt</span>                ← Pinned SDK versions
+├── <span class="file">.env</span>                            ← Environment variables
+├── <span class="file">agent.yaml</span>                      ← Foundry hosted agent manifest
+├── <span class="file">Dockerfile</span>                      ← Container for Foundry deployment
+│
+├── <span class="folder">tools/</span>
+│   ├── <span class="file">doc_intelligence.py</span>         ← FunctionTool: PDF/Image extraction
+│   └── <span class="file">sql_server.py</span>               ← FunctionTool: Read-only SQL queries
+│
+├── <span class="folder">agents/</span>
+│   ├── <span class="file">planner.py</span>                  ← Planner agent (task decomposition)
+│   ├── <span class="file">executor.py</span>                 ← Executor agent (tool dispatch)
+│   └── <span class="file">reflection.py</span>              ← Reflection agent (reasoning + confidence)
+│
+├── <span class="folder">cache/</span>
+│   └── <span class="file">semantic_cache.py</span>           ← Redis HNSW vector cache
+│
+├── <span class="folder">workflow/</span>
+│   └── <span class="file">rag_workflow.py</span>             ← WorkflowBuilder graph (Plan → Execute → Reflect)
+│
+├── <span class="folder">ingestion/</span>
+│   └── <span class="file">ingest.py</span>                  ← PDF → chunk → embed → upload to AI Search
+│
+└── <span class="folder">.foundry/</span>
+    └── <span class="file">agent-metadata.yaml</span>         ← Foundry workspace metadata
+    </div>
+</section>
+
+<!-- ═══════════════ 9. IMPLEMENTATION ══════════════════ -->
+<section id="implementation">
+    <h2>9. Implementation — Full Source Code</h2>
+
+    <h3>9.1 requirements.txt</h3>
+<pre><span class="lang">TXT</span>
+<code># Microsoft Agent Framework (pinned pre-release)
+agent-framework-azure-ai==1.0.0rc3
+agent-framework-core==1.0.0rc3
+
+# Hosting adapter for Foundry
+azure-ai-agentserver-agentframework==1.0.0b16
+azure-ai-agentserver-core==1.0.0b16
+
+# Azure AI services
+azure-ai-projects
+azure-ai-documentintelligence==1.0.0
+azure-identity
+
+# Database
+pyodbc
+
+# Caching
+redis[hiredis]
+numpy
+
+# Environment
+python-dotenv
+</code></pre>
+
+    <h3>9.2 .env</h3>
+<pre><span class="lang">ENV</span>
+<code># Azure AI Foundry
+FOUNDRY_PROJECT_ENDPOINT=https://&lt;resource&gt;.services.ai.azure.com/api/projects/&lt;project&gt;
+FOUNDRY_MODEL_DEPLOYMENT_NAME=gpt-4o
+
+# Azure AI Search (connected via Foundry project connection)
+AZURE_AI_SEARCH_CONNECTION_NAME=my-search-connection
+AI_SEARCH_INDEX_NAME=rag-index
+
+# Document Intelligence
+DOC_INTEL_ENDPOINT=https://&lt;resource&gt;.cognitiveservices.azure.com/
+DOC_INTEL_KEY=&lt;key&gt;
+
+# SQL Server
+SQL_CONNECTION_STRING=Driver={ODBC Driver 18 for SQL Server};Server=&lt;server&gt;;Database=&lt;db&gt;;Uid=&lt;user&gt;;Pwd=&lt;pwd&gt;;Encrypt=yes;
+
+# Redis (semantic cache)
+REDIS_URL=rediss://&lt;redis&gt;.redis.cache.windows.net:10000
+REDIS_PASSWORD=&lt;key&gt;
+CACHE_SIMILARITY_THRESHOLD=0.92
+
+# Embedding (for cache — agent memory uses its own)
+AZURE_OPENAI_ENDPOINT=https://&lt;resource&gt;.openai.azure.com/
+AZURE_OPENAI_KEY=&lt;key&gt;
+EMBEDDING_DEPLOYMENT=text-embedding-3-large
+EMBEDDING_DIMENSIONS=3072
+</code></pre>
+
+    <h3>9.3 agent.yaml — Foundry Manifest</h3>
+<pre><span class="lang">YAML</span>
+<code>name: agentic-rag
+description: Agentic RAG with planning, reasoning, memory, and multi-source retrieval
+template:
+  kind: hosted
+  protocols:
+    - name: responses
+      version: v1
+  environment_variables:
+    - FOUNDRY_PROJECT_ENDPOINT
+    - FOUNDRY_MODEL_DEPLOYMENT_NAME
+    - AZURE_AI_SEARCH_CONNECTION_NAME
+    - AI_SEARCH_INDEX_NAME
+    - DOC_INTEL_ENDPOINT
+    - DOC_INTEL_KEY
+    - SQL_CONNECTION_STRING
+    - REDIS_URL
+    - REDIS_PASSWORD
+    - AZURE_OPENAI_ENDPOINT
+    - AZURE_OPENAI_KEY
+    - EMBEDDING_DEPLOYMENT
+</code></pre>
+</section>
+
+<!-- ═══════════════ 10. MEMORY ══════════════════ -->
+<section id="memory">
+    <h2>10. Memory Pillar — Built-in Agent Memory</h2>
+
+    <p>
+        The Agent Framework provides <strong>managed memory</strong> — no custom vector index code needed.
+        Foundry automatically stores conversation summaries and user profiles with vector embeddings,
+        persisted across sessions and devices.
+    </p>
+
+    <h3>How It Works</h3>
+    <table>
+        <thead><tr><th>Option</th><th>Purpose</th></tr></thead>
+        <tbody>
+            <tr><td><code>chat_summary_enabled</code></td><td>Automatically summarizes conversations for memory</td></tr>
+            <tr><td><code>user_profile_enabled</code></td><td>Builds and maintains a user profile over time</td></tr>
+            <tr><td><code>user_profile_details</code></td><td>Controls what data gets stored (e.g., exclude sensitive info)</td></tr>
+            <tr><td><code>scope</code></td><td>Partitions memory per user — each user gets isolated memory</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Setup — Create Memory Store</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">from</span> azure.ai.projects <span class="kw">import</span> AIProjectClient
+<span class="kw">from</span> azure.identity <span class="kw">import</span> DefaultAzureCredential
+
+client = AIProjectClient(
+    endpoint=os.environ[<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>],
+    credential=DefaultAzureCredential(),
+)
+
+<span class="cmt"># Create a managed memory store (one-time setup)</span>
+memory_store = client.agents.memory.create_memory_store(
+    name=<span class="str">"rag-memory"</span>,
+    chat_model_deployment=<span class="str">"gpt-4o"</span>,
+    embedding_model_deployment=<span class="str">"text-embedding-3-large"</span>,
+    chat_summary_enabled=<span class="kw">True</span>,
+    user_profile_enabled=<span class="kw">True</span>,
+    user_profile_details=<span class="str">"Store user preferences, past queries, learned facts. "</span>
+                         <span class="str">"Avoid sensitive data such as SSN, passwords, financial details."</span>,
+)
+<span class="fn">print</span>(<span class="str">f"Memory store created: </span>{memory_store.name}<span class="str">"</span>)
+</code></pre>
+
+    <h3>Attach Memory to Agent</h3>
+<pre><span class="lang">Python</span>
+<code><span class="cmt"># When creating the executor agent, attach memory</span>
+<span class="kw">async with</span> AzureAIClient(
+    project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+    model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+    credential=credential,
+).<span class="fn">as_agent</span>(
+    name=<span class="str">"RagExecutor"</span>,
+    instructions=<span class="str">"""You are an intelligent RAG executor with memory.
+Use your memory to recall past conversations and user preferences.
+Always check memory first before searching external sources."""</span>,
+    tools=[ai_search_tool, web_search_tool, doc_intel_tool, sql_tool],
+    memory_store=<span class="str">"rag-memory"</span>,  <span class="cmt"># Attach the memory store</span>
+    memory_scope=user_id,        <span class="cmt"># Partition per user</span>
+) <span class="kw">as</span> executor_agent:
+    <span class="cmt"># Agent now has automatic memory recall and storage</span>
+    ...
+</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Conversation Threads:</strong> The Agent Framework also manages <strong>short-term memory</strong>
+        through conversation threads. Each thread maintains message history — no custom
+        <code>ConcurrentDictionary</code> needed. Threads persist for the session duration.
+    </div>
+</section>
+
+<!-- ═══════════════ 11. PLANNING ══════════════════ -->
+<section id="planning">
+    <h2>11. Planning Pillar — Planner Agent</h2>
+
+    <h3>agents/planner.py</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">import</span> json
+<span class="kw">from</span> agent_framework.azure <span class="kw">import</span> AzureAIClient
+<span class="kw">from</span> azure.identity.aio <span class="kw">import</span> DefaultAzureCredential
+
+<span class="cls">PLANNER_INSTRUCTIONS</span> = <span class="str">"""
+You are a planning agent. Given a user question and any relevant memory context,
+decompose it into an ordered list of steps. Each step must specify which tool to use.
+
+Available tools:
+- "search_knowledge_base": Search internal documents via Azure AI Search (hybrid)
+- "query_sql": Query structured data in SQL Server (generate a SELECT query)
+- "extract_document": Extract text from a specific PDF or image file path
+- "web_search": Search the internet for real-time or external information
+- "memory_recall": Retrieve relevant past memories about the user
+
+Rules:
+1. Start with memory_recall if the question might relate to past conversations
+2. Prefer internal sources before web_search
+3. For simple questions, 1-2 steps is fine
+4. Always end with a synthesize step (toolToUse: "synthesize")
+
+Respond with ONLY a JSON object: { "steps": [...] }
+Each step: { "stepNumber": N, "description": "...", "toolToUse": "...", "toolInput": "..." }
+"""</span>
+
+
+<span class="kw">async def</span> <span class="fn">create_planner_agent</span>(credential):
+    <span class="str">"""Create a dedicated planner agent."""</span>
+    client = AzureAIClient(
+        project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+        credential=credential,
+    )
+    <span class="kw">return</span> <span class="kw">await</span> client.<span class="fn">as_agent</span>(
+        name=<span class="str">"RagPlanner"</span>,
+        instructions=<span class="cls">PLANNER_INSTRUCTIONS</span>,
+    ).__aenter__()
+
+
+<span class="kw">async def</span> <span class="fn">create_plan</span>(planner_agent, question: <span class="cls">str</span>, memories: list[<span class="cls">str</span>] | <span class="kw">None</span> = <span class="kw">None</span>) -> list[<span class="cls">dict</span>]:
+    <span class="str">"""Generate an execution plan for the given question."""</span>
+    context = <span class="str">""</span>
+    <span class="kw">if</span> memories:
+        context = <span class="str">f"\n\nRelevant memories:\n"</span> + <span class="str">"\n"</span>.join(memories)
+
+    prompt = <span class="str">f"Question: </span>{question}{context}<span class="str">"</span>
+
+    <span class="cmt"># Get non-streaming response for plan</span>
+    response = <span class="kw">await</span> planner_agent.<span class="fn">run</span>(prompt, stream=<span class="kw">False</span>)
+    text = response.text
+
+    <span class="cmt"># Parse JSON plan</span>
+    data = json.<span class="fn">loads</span>(text)
+    steps = data.<span class="fn">get</span>(<span class="str">"steps"</span>, data <span class="kw">if isinstance</span>(data, list) <span class="kw">else</span> [])
+    <span class="kw">return</span> steps
+</code></pre>
+
+    <h3>Example Plan Output</h3>
+<pre><span class="lang">JSON</span>
+<code>{
+  "steps": [
+    { "stepNumber": 1, "description": "Recall past revenue discussions",
+      "toolToUse": "memory_recall", "toolInput": "revenue Q3 Q4 finance" },
+    { "stepNumber": 2, "description": "Search PDFs for Q3 revenue data",
+      "toolToUse": "search_knowledge_base", "toolInput": "Q3 revenue finance report" },
+    { "stepNumber": 3, "description": "Search PDFs for Q4 revenue data",
+      "toolToUse": "search_knowledge_base", "toolInput": "Q4 revenue finance report" },
+    { "stepNumber": 4, "description": "Query SQL for quarterly revenue totals",
+      "toolToUse": "query_sql",
+      "toolInput": "SELECT quarter, SUM(revenue) AS total FROM sales WHERE quarter IN ('Q3','Q4') GROUP BY quarter" },
+    { "stepNumber": 5, "description": "Synthesize and compare all sources",
+      "toolToUse": "synthesize", "toolInput": "combine results" }
+  ]
+}
+</code></pre>
+</section>
+
+<!-- ═══════════════ 12. REASONING ══════════════════ -->
+<section id="reasoning">
+    <h2>12. Reasoning Pillar — Reflection Agent</h2>
+
+    <h3>agents/reflection.py</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">import</span> json
+<span class="kw">from</span> agent_framework.azure <span class="kw">import</span> AzureAIClient
+
+<span class="cls">REFLECTION_INSTRUCTIONS</span> = <span class="str">"""
+You are a critical reasoning agent. Given a user's question and gathered evidence,
+evaluate whether we have enough information for a complete, accurate answer.
+
+Analyze:
+1. Does the evidence directly answer the question?
+2. Are there contradictions between sources?
+3. Is any critical information missing?
+4. How confident are you (0.0 to 1.0)?
+
+Respond with ONLY a JSON object:
+{
+  "isComplete": true/false,
+  "confidenceScore": 0.0-1.0,
+  "gapAnalysis": "what's missing or null",
+  "suggestedAction": "what to do next or null",
+  "finalAnswer": "synthesised answer if isComplete=true, null otherwise"
+}
+
+If confidence >= 0.8, set isComplete=true and provide finalAnswer.
+If confidence < 0.8, set isComplete=false and explain what's needed.
+"""</span>
+
+
+<span class="kw">async def</span> <span class="fn">create_reflection_agent</span>(credential):
+    <span class="str">"""Create a dedicated reflection/reasoning agent."""</span>
+    client = AzureAIClient(
+        project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+        credential=credential,
+    )
+    <span class="kw">return</span> <span class="kw">await</span> client.<span class="fn">as_agent</span>(
+        name=<span class="str">"RagReflector"</span>,
+        instructions=<span class="cls">REFLECTION_INSTRUCTIONS</span>,
+    ).__aenter__()
+
+
+<span class="kw">async def</span> <span class="fn">evaluate_evidence</span>(reflection_agent, question: <span class="cls">str</span>, evidence: <span class="cls">dict</span>[<span class="cls">str</span>, <span class="cls">str</span>]) -> <span class="cls">dict</span>:
+    <span class="str">"""Evaluate gathered evidence and determine if answer is complete."""</span>
+    evidence_text = <span class="str">"\n\n"</span>.join(
+        <span class="str">f"--- Source: </span>{k}<span class="str"> ---\n</span>{v}<span class="str">"</span> <span class="kw">for</span> k, v <span class="kw">in</span> evidence.items()
+    )
+    prompt = <span class="str">f"Question: </span>{question}<span class="str">\n\nEvidence:\n</span>{evidence_text}<span class="str">"</span>
+
+    response = <span class="kw">await</span> reflection_agent.<span class="fn">run</span>(prompt, stream=<span class="kw">False</span>)
+    <span class="kw">return</span> json.<span class="fn">loads</span>(response.text)
+</code></pre>
+
+    <h3>Reasoning Flow</h3>
+    <div class="flow">
+<pre>
+  Evidence Gathered
+        │
+        ▼
+  ┌─────────────────────────┐
+  │   REFLECTION AGENT      │
+  │                         │
+  │  • Answer complete?     │
+  │  • Sources consistent?  │
+  │  • Confidence score?    │
+  └─────────┬───────────────┘
+            │
+    ┌───────┼───────┐
+    ▼               ▼
+ ≥ 0.8           &lt; 0.8
+ Complete       Incomplete
+    │               │
+    ▼               ▼
+ Return          Gap Analysis
+ Final           + Re-plan
+ Answer          (max 2×)
+</pre>
+    </div>
+</section>
+
+<!-- ═══════════════ 13. CACHING ══════════════════ -->
+<section id="caching">
+    <h2>13. Caching Pillar — Redis Semantic Cache</h2>
+
+    <p>
+        This is the one component we still implement custom — the Agent Framework doesn't include
+        semantic caching. We use <strong>Redis Enterprise with RediSearch</strong> and HNSW vector index.
+    </p>
+
+    <h3>cache/semantic_cache.py</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">import</span> json
+<span class="kw">import</span> uuid
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> redis
+<span class="kw">from</span> redis.commands.search.field <span class="kw">import</span> TextField, VectorField
+<span class="kw">from</span> redis.commands.search.indexDefinition <span class="kw">import</span> IndexDefinition, IndexType
+<span class="kw">from</span> redis.commands.search.query <span class="kw">import</span> Query
+<span class="kw">from</span> openai <span class="kw">import</span> AzureOpenAI
+
+
+<span class="kw">class</span> <span class="cls">SemanticCache</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.redis_client = redis.<span class="fn">from_url</span>(
+            os.getenv(<span class="str">"REDIS_URL"</span>),
+            password=os.getenv(<span class="str">"REDIS_PASSWORD"</span>),
+            decode_responses=<span class="kw">False</span>,
+        )
+        self.embedding_client = AzureOpenAI(
+            azure_endpoint=os.getenv(<span class="str">"AZURE_OPENAI_ENDPOINT"</span>),
+            api_key=os.getenv(<span class="str">"AZURE_OPENAI_KEY"</span>),
+            api_version=<span class="str">"2024-10-21"</span>,
+        )
+        self.deployment = os.getenv(<span class="str">"EMBEDDING_DEPLOYMENT"</span>)
+        self.dims = <span class="num">int</span>(os.getenv(<span class="str">"EMBEDDING_DIMENSIONS"</span>, <span class="str">"3072"</span>))
+        self.threshold = <span class="num">float</span>(os.getenv(<span class="str">"CACHE_SIMILARITY_THRESHOLD"</span>, <span class="str">"0.92"</span>))
+        self.index_name = <span class="str">"semantic_cache_idx"</span>
+        self.prefix = <span class="str">"cache:"</span>
+        self.<span class="fn">_ensure_index</span>()
+
+    <span class="kw">def</span> <span class="fn">_ensure_index</span>(self):
+        <span class="kw">try</span>:
+            self.redis_client.ft(self.index_name).<span class="fn">info</span>()
+        <span class="kw">except</span> redis.ResponseError:
+            schema = (
+                TextField(<span class="str">"$.question"</span>, as_name=<span class="str">"question"</span>),
+                TextField(<span class="str">"$.answer"</span>, as_name=<span class="str">"answer"</span>),
+                VectorField(
+                    <span class="str">"$.embedding"</span>, <span class="str">"HNSW"</span>,
+                    {<span class="str">"TYPE"</span>: <span class="str">"FLOAT32"</span>, <span class="str">"DIM"</span>: self.dims, <span class="str">"DISTANCE_METRIC"</span>: <span class="str">"COSINE"</span>},
+                    as_name=<span class="str">"embedding"</span>,
+                ),
+            )
+            self.redis_client.ft(self.index_name).<span class="fn">create_index</span>(
+                schema, definition=IndexDefinition(prefix=[self.prefix], index_type=IndexType.JSON)
+            )
+
+    <span class="kw">def</span> <span class="fn">_embed</span>(self, text: <span class="cls">str</span>) -> list[<span class="cls">float</span>]:
+        resp = self.embedding_client.embeddings.<span class="fn">create</span>(
+            input=text, model=self.deployment, dimensions=self.dims
+        )
+        <span class="kw">return</span> resp.data[<span class="num">0</span>].embedding
+
+    <span class="kw">def</span> <span class="fn">lookup</span>(self, question: <span class="cls">str</span>) -> <span class="cls">str</span> | <span class="kw">None</span>:
+        <span class="str">"""Check if a similar question exists in cache."""</span>
+        embedding = self.<span class="fn">_embed</span>(question)
+        vec_bytes = np.<span class="fn">array</span>(embedding, dtype=np.float32).<span class="fn">tobytes</span>()
+
+        q = (
+            Query(<span class="str">"(*)=>[KNN 1 @embedding $vec AS score]"</span>)
+            .<span class="fn">return_fields</span>(<span class="str">"question"</span>, <span class="str">"answer"</span>, <span class="str">"score"</span>)
+            .<span class="fn">sort_by</span>(<span class="str">"score"</span>)
+            .<span class="fn">dialect</span>(<span class="num">2</span>)
+        )
+        results = self.redis_client.ft(self.index_name).<span class="fn">search</span>(q, {<span class="str">"vec"</span>: vec_bytes})
+
+        <span class="kw">if</span> results.total > <span class="num">0</span>:
+            doc = results.docs[<span class="num">0</span>]
+            score = <span class="num">float</span>(doc.score)
+            similarity = <span class="num">1.0</span> - score  <span class="cmt"># cosine distance → similarity</span>
+            <span class="kw">if</span> similarity >= self.threshold:
+                <span class="kw">return</span> doc.answer.<span class="fn">decode</span>() <span class="kw">if isinstance</span>(doc.answer, <span class="cls">bytes</span>) <span class="kw">else</span> doc.answer
+        <span class="kw">return</span> <span class="kw">None</span>
+
+    <span class="kw">def</span> <span class="fn">store</span>(self, question: <span class="cls">str</span>, answer: <span class="cls">str</span>):
+        <span class="str">"""Store a Q&amp;A pair with its embedding."""</span>
+        embedding = self.<span class="fn">_embed</span>(question)
+        key = <span class="str">f"</span>{self.prefix}{uuid.<span class="fn">uuid4</span>().hex}<span class="str">"</span>
+        self.redis_client.json().<span class="fn">set</span>(key, <span class="str">"$"</span>, {
+            <span class="str">"question"</span>: question,
+            <span class="str">"answer"</span>: answer,
+            <span class="str">"embedding"</span>: embedding,
+        })
+</code></pre>
+</section>
+
+<!-- ═══════════════ 14. CUSTOM TOOLS ══════════════════ -->
+<section id="custom-tools">
+    <h2>14. Custom FunctionTools</h2>
+
+    <h3>tools/doc_intelligence.py — PDF &amp; Image Extraction</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">from</span> azure.ai.documentintelligence <span class="kw">import</span> DocumentIntelligenceClient
+<span class="kw">from</span> azure.ai.documentintelligence.models <span class="kw">import</span> AnalyzeDocumentRequest
+<span class="kw">from</span> azure.core.credentials <span class="kw">import</span> AzureKeyCredential
+
+
+client = DocumentIntelligenceClient(
+    endpoint=os.getenv(<span class="str">"DOC_INTEL_ENDPOINT"</span>),
+    credential=AzureKeyCredential(os.getenv(<span class="str">"DOC_INTEL_KEY"</span>)),
+)
+
+
+<span class="kw">def</span> <span class="fn">extract_document</span>(file_path: <span class="cls">str</span>) -> <span class="cls">str</span>:
+    <span class="str">"""Extract text and tables from a PDF or image using Azure Document Intelligence.
+
+    Args:
+        file_path: Full path to the PDF or image file to extract text from.
+
+    Returns:
+        Extracted text content including page text and structured tables.
+    """</span>
+    <span class="kw">with</span> <span class="fn">open</span>(file_path, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+        poller = client.<span class="fn">begin_analyze_document</span>(
+            <span class="str">"prebuilt-layout"</span>,
+            analyze_request=f,
+            content_type=<span class="str">"application/octet-stream"</span>,
+        )
+    result = poller.<span class="fn">result</span>()
+
+    lines = []
+    <span class="cmt"># Extract page text</span>
+    <span class="kw">if</span> result.pages:
+        <span class="kw">for</span> page <span class="kw">in</span> result.pages:
+            lines.<span class="fn">append</span>(<span class="str">f"--- Page </span>{page.page_number}<span class="str"> ---"</span>)
+            <span class="kw">if</span> page.lines:
+                <span class="kw">for</span> line <span class="kw">in</span> page.lines:
+                    lines.<span class="fn">append</span>(line.content)
+
+    <span class="cmt"># Extract tables</span>
+    <span class="kw">if</span> result.tables:
+        <span class="kw">for</span> i, table <span class="kw">in</span> <span class="fn">enumerate</span>(result.tables):
+            lines.<span class="fn">append</span>(<span class="str">f"\n--- Table </span>{i + <span class="num">1</span>}<span class="str"> ---"</span>)
+            rows: <span class="cls">dict</span>[<span class="cls">int</span>, <span class="cls">dict</span>[<span class="cls">int</span>, <span class="cls">str</span>]] = {}
+            <span class="kw">for</span> cell <span class="kw">in</span> table.cells:
+                rows.<span class="fn">setdefault</span>(cell.row_index, {})[cell.column_index] = cell.content
+            <span class="kw">for</span> row_idx <span class="kw">in</span> <span class="fn">sorted</span>(rows):
+                vals = [rows[row_idx].<span class="fn">get</span>(c, <span class="str">""</span>) <span class="kw">for</span> c <span class="kw">in</span> <span class="fn">range</span>(table.column_count)]
+                lines.<span class="fn">append</span>(<span class="str">" | "</span>.join(vals))
+
+    <span class="kw">return</span> <span class="str">"\n"</span>.join(lines)
+</code></pre>
+
+    <h3>tools/sql_server.py — Read-Only SQL</h3>
+    <div class="callout callout-danger">
+        <strong>Security:</strong> Only SELECT queries permitted. INSERT, UPDATE, DELETE, DROP, EXEC, and
+        all DDL/DML write operations are blocked. Results limited to 100 rows.
+    </div>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">import</span> pyodbc
+
+<span class="cls">BLOCKED_KEYWORDS</span> = {
+    <span class="str">"INSERT"</span>, <span class="str">"UPDATE"</span>, <span class="str">"DELETE"</span>, <span class="str">"DROP"</span>, <span class="str">"ALTER"</span>, <span class="str">"CREATE"</span>,
+    <span class="str">"TRUNCATE"</span>, <span class="str">"EXEC"</span>, <span class="str">"EXECUTE"</span>, <span class="str">"MERGE"</span>, <span class="str">"GRANT"</span>, <span class="str">"REVOKE"</span>, <span class="str">"xp_"</span>, <span class="str">"sp_"</span>,
+}
+
+
+<span class="kw">def</span> <span class="fn">query_sql</span>(query: <span class="cls">str</span>) -> <span class="cls">str</span>:
+    <span class="str">"""Execute a read-only SELECT query against SQL Server and return results.
+
+    Args:
+        query: A SQL SELECT query to run. Only SELECT statements are allowed.
+
+    Returns:
+        Query results formatted as a pipe-delimited table, or an error message.
+    """</span>
+    trimmed = query.<span class="fn">strip</span>()
+    first_word = trimmed.<span class="fn">split</span>()[<span class="num">0</span>].<span class="fn">upper</span>() <span class="kw">if</span> trimmed <span class="kw">else</span> <span class="str">""</span>
+
+    <span class="kw">if</span> first_word != <span class="str">"SELECT"</span>:
+        <span class="kw">return</span> <span class="str">"Error: Only SELECT queries are allowed."</span>
+
+    upper_query = query.<span class="fn">upper</span>()
+    <span class="kw">for</span> kw <span class="kw">in</span> <span class="cls">BLOCKED_KEYWORDS</span>:
+        <span class="kw">if</span> kw.<span class="fn">upper</span>() <span class="kw">in</span> upper_query:
+            <span class="kw">return</span> <span class="str">f"Error: '</span>{kw}<span class="str">' operations are not permitted."</span>
+
+    conn = pyodbc.<span class="fn">connect</span>(os.getenv(<span class="str">"SQL_CONNECTION_STRING"</span>))
+    cursor = conn.<span class="fn">cursor</span>()
+    cursor.<span class="fn">execute</span>(trimmed)
+
+    columns = [desc[<span class="num">0</span>] <span class="kw">for</span> desc <span class="kw">in</span> cursor.description]
+    lines = [<span class="str">" | "</span>.join(columns)]
+    lines.<span class="fn">append</span>(<span class="str">"-"</span> * <span class="fn">len</span>(lines[<span class="num">0</span>]))
+
+    row_count = <span class="num">0</span>
+    <span class="kw">for</span> row <span class="kw">in</span> cursor.<span class="fn">fetchall</span>():
+        <span class="kw">if</span> row_count >= <span class="num">100</span>:
+            <span class="kw">break</span>
+        lines.<span class="fn">append</span>(<span class="str">" | "</span>.join(<span class="fn">str</span>(v) <span class="kw">if</span> v <span class="kw">is not None else</span> <span class="str">"NULL"</span> <span class="kw">for</span> v <span class="kw">in</span> row))
+        row_count += <span class="num">1</span>
+
+    cursor.<span class="fn">close</span>()
+    conn.<span class="fn">close</span>()
+    <span class="kw">return</span> <span class="str">"\n"</span>.join(lines)
+</code></pre>
+</section>
+
+<!-- ═══════════════ 15. ORCHESTRATOR ══════════════════ -->
+<section id="orchestrator">
+    <h2>15. Agentic Orchestrator — Workflow Graph</h2>
+
+    <p>
+        The heart of the system. Uses the Agent Framework's <code>WorkflowBuilder</code>
+        to wire the three agents (Planner → Executor → Reflection) into a graph with a
+        conditional loop-back edge.
+    </p>
+
+    <h3>workflow/rag_workflow.py</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">import</span> json
+<span class="kw">import</span> logging
+<span class="kw">from</span> agent_framework.azure <span class="kw">import</span> AzureAIClient
+<span class="kw">from</span> agent_framework.core <span class="kw">import</span> WorkflowBuilder, Message
+<span class="kw">from</span> azure.identity.aio <span class="kw">import</span> DefaultAzureCredential
+<span class="kw">from</span> azure.ai.projects <span class="kw">import</span> AIProjectClient
+<span class="kw">from</span> azure.ai.agents.models <span class="kw">import</span> (
+    AzureAISearchToolDefinition, AzureAISearchToolResource,
+    AISearchIndexResource, AzureAISearchQueryType,
+    FunctionTool, ToolSet, WebSearchPreviewTool,
+)
+
+<span class="kw">from</span> tools.doc_intelligence <span class="kw">import</span> extract_document
+<span class="kw">from</span> tools.sql_server <span class="kw">import</span> query_sql
+<span class="kw">from</span> cache.semantic_cache <span class="kw">import</span> SemanticCache
+
+logger = logging.<span class="fn">getLogger</span>(__name__)
+
+<span class="cls">MAX_REPLAN_ATTEMPTS</span> = <span class="num">2</span>
+
+
+<span class="kw">async def</span> <span class="fn">build_rag_workflow</span>():
+    <span class="str">"""Build the complete Agentic RAG workflow graph."""</span>
+    credential = DefaultAzureCredential()
+    cache = SemanticCache()
+
+    <span class="cmt"># ─── Set up project client for AI Search connection ───</span>
+    project_client = AIProjectClient(
+        endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        credential=credential,
+    )
+    search_connection = project_client.connections.<span class="fn">get</span>(
+        os.getenv(<span class="str">"AZURE_AI_SEARCH_CONNECTION_NAME"</span>)
+    )
+
+    <span class="cmt"># ─── Built-in Tools ───</span>
+    ai_search_tool = AzureAISearchToolDefinition(
+        azure_ai_search=AzureAISearchToolResource(indexes=[
+            AISearchIndexResource(
+                index_connection_id=search_connection.id,
+                index_name=os.getenv(<span class="str">"AI_SEARCH_INDEX_NAME"</span>),
+                query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
+            ),
+        ])
+    )
+
+    web_search_tool = WebSearchPreviewTool()  <span class="cmt"># Zero config!</span>
+
+    <span class="cmt"># ─── Custom FunctionTools ───</span>
+    custom_functions = FunctionTool([extract_document, query_sql])
+    toolset = ToolSet()
+    toolset.<span class="fn">add</span>(custom_functions)
+
+    <span class="cmt"># ═══════════════════════════════════════════</span>
+    <span class="cmt"># CREATE THREE SPECIALISED AGENTS</span>
+    <span class="cmt"># ═══════════════════════════════════════════</span>
+
+    <span class="cmt"># 1. Planner Agent — decomposes queries</span>
+    planner_client = AzureAIClient(
+        project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+        credential=credential,
+    )
+    planner_agent = <span class="kw">await</span> planner_client.<span class="fn">as_agent</span>(
+        name=<span class="str">"RagPlanner"</span>,
+        instructions=<span class="cls">PLANNER_INSTRUCTIONS</span>,
+    ).__aenter__()
+
+    <span class="cmt"># 2. Executor Agent — has ALL tools + memory</span>
+    executor_client = AzureAIClient(
+        project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+        credential=credential,
+    )
+    executor_agent = <span class="kw">await</span> executor_client.<span class="fn">as_agent</span>(
+        name=<span class="str">"RagExecutor"</span>,
+        instructions=<span class="str">"""You are an intelligent RAG executor. Use your tools to gather evidence:
+- Use search_knowledge_base (AI Search) for internal documents
+- Use web_search for real-time internet information
+- Use extract_document for specific PDF/image files
+- Use query_sql for structured database queries
+Gather comprehensive evidence and return it clearly organized."""</span>,
+        tools=[ai_search_tool, web_search_tool],
+        toolset=toolset,
+        memory_store=<span class="str">"rag-memory"</span>,
+    ).__aenter__()
+
+    <span class="cmt"># 3. Reflection Agent — evaluates evidence</span>
+    reflection_client = AzureAIClient(
+        project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+        credential=credential,
+    )
+    reflection_agent = <span class="kw">await</span> reflection_client.<span class="fn">as_agent</span>(
+        name=<span class="str">"RagReflector"</span>,
+        instructions=<span class="cls">REFLECTION_INSTRUCTIONS</span>,
+    ).__aenter__()
+
+    <span class="cmt"># ═══════════════════════════════════════════</span>
+    <span class="cmt"># ORCHESTRATION FUNCTION</span>
+    <span class="cmt"># ═══════════════════════════════════════════</span>
+
+    <span class="kw">async def</span> <span class="fn">ask</span>(question: <span class="cls">str</span>, user_id: <span class="cls">str</span> = <span class="str">"default"</span>) -> <span class="cls">dict</span>:
+        <span class="str">"""Full agentic RAG pipeline: Cache → Plan → Execute → Reflect → Re-plan."""</span>
+
+        <span class="cmt"># Step 1: Semantic Cache</span>
+        cached = cache.<span class="fn">lookup</span>(question)
+        <span class="kw">if</span> cached:
+            logger.<span class="fn">info</span>(<span class="str">"Cache HIT"</span>)
+            <span class="kw">return</span> {<span class="str">"answer"</span>: cached, <span class="str">"from_cache"</span>: <span class="kw">True</span>}
+
+        <span class="cmt"># Step 2: Plan</span>
+        logger.<span class="fn">info</span>(<span class="str">"Creating execution plan..."</span>)
+        plan_response = <span class="kw">await</span> planner_agent.<span class="fn">run</span>(
+            <span class="str">f"Question: </span>{question}<span class="str">"</span>, stream=<span class="kw">False</span>
+        )
+        plan = json.<span class="fn">loads</span>(plan_response.text).<span class="fn">get</span>(<span class="str">"steps"</span>, [])
+        logger.<span class="fn">info</span>(<span class="str">"Plan has %d steps"</span>, <span class="fn">len</span>(plan))
+
+        <span class="cmt"># Step 3-5: Execute + Reflect loop</span>
+        evidence = {}
+        final_answer = <span class="kw">None</span>
+
+        <span class="kw">for</span> attempt <span class="kw">in</span> <span class="fn">range</span>(<span class="cls">MAX_REPLAN_ATTEMPTS</span> + <span class="num">1</span>):
+            <span class="cmt"># Execute — send plan to executor agent (which has all tools)</span>
+            exec_prompt = <span class="str">f"""Execute this plan to answer: </span>{question}<span class="str">
+
+Plan:
+</span>{json.<span class="fn">dumps</span>(plan, indent=<span class="num">2</span>)}<span class="str">
+
+Gather evidence from each step and return organized results."""</span>
+
+            exec_response = <span class="kw">await</span> executor_agent.<span class="fn">run</span>(exec_prompt, stream=<span class="kw">False</span>)
+            evidence[<span class="str">f"Attempt </span>{attempt + <span class="num">1</span>}<span class="str">"</span>] = exec_response.text
+
+            <span class="cmt"># Reflect</span>
+            logger.<span class="fn">info</span>(<span class="str">"Reflecting (attempt %d/%d)..."</span>, attempt + <span class="num">1</span>, <span class="cls">MAX_REPLAN_ATTEMPTS</span> + <span class="num">1</span>)
+            reflect_prompt = <span class="str">f"Question: </span>{question}<span class="str">\n\nEvidence:\n</span>{exec_response.text}<span class="str">"</span>
+            reflect_response = <span class="kw">await</span> reflection_agent.<span class="fn">run</span>(reflect_prompt, stream=<span class="kw">False</span>)
+            reasoning = json.<span class="fn">loads</span>(reflect_response.text)
+
+            logger.<span class="fn">info</span>(
+                <span class="str">"Confidence: %.2f | Complete: %s"</span>,
+                reasoning[<span class="str">"confidenceScore"</span>], reasoning[<span class="str">"isComplete"</span>]
+            )
+
+            <span class="kw">if</span> reasoning[<span class="str">"isComplete"</span>] <span class="kw">and</span> reasoning.<span class="fn">get</span>(<span class="str">"finalAnswer"</span>):
+                final_answer = reasoning[<span class="str">"finalAnswer"</span>]
+                <span class="kw">break</span>
+
+            <span class="cmt"># Re-plan with gap info</span>
+            <span class="kw">if</span> attempt &lt; <span class="cls">MAX_REPLAN_ATTEMPTS</span> <span class="kw">and</span> reasoning.<span class="fn">get</span>(<span class="str">"suggestedAction"</span>):
+                logger.<span class="fn">info</span>(<span class="str">"Re-planning — gap: %s"</span>, reasoning.<span class="fn">get</span>(<span class="str">"gapAnalysis"</span>))
+                replan_prompt = (
+                    <span class="str">f"Question: </span>{question}<span class="str">\n"</span>
+                    <span class="str">f"Gap: </span>{reasoning.<span class="fn">get</span>(<span class="str">'gapAnalysis'</span>)}<span class="str">\n"</span>
+                    <span class="str">f"Suggested: </span>{reasoning.<span class="fn">get</span>(<span class="str">'suggestedAction'</span>)}<span class="str">"</span>
+                )
+                replan_response = <span class="kw">await</span> planner_agent.<span class="fn">run</span>(replan_prompt, stream=<span class="kw">False</span>)
+                plan = json.<span class="fn">loads</span>(replan_response.text).<span class="fn">get</span>(<span class="str">"steps"</span>, [])
+
+        <span class="kw">if not</span> final_answer:
+            final_answer = <span class="str">"Unable to find a satisfactory answer after multiple attempts."</span>
+
+        <span class="cmt"># Step 6: Cache the result</span>
+        cache.<span class="fn">store</span>(question, final_answer)
+        logger.<span class="fn">info</span>(<span class="str">"Answer cached."</span>)
+
+        <span class="kw">return</span> {<span class="str">"answer"</span>: final_answer, <span class="str">"from_cache"</span>: <span class="kw">False</span>}
+
+    <span class="kw">return</span> ask
+
+
+<span class="cmt"># Planner / Reflection instruction constants (same as sections 11 & 12)</span>
+<span class="cls">PLANNER_INSTRUCTIONS</span> = <span class="str">"""You are a planning agent. Decompose queries into ordered steps.
+Available tools: search_knowledge_base, query_sql, extract_document, web_search, memory_recall.
+Respond ONLY with JSON: { "steps": [...] }
+Each step: { "stepNumber": N, "description": "...", "toolToUse": "...", "toolInput": "..." }
+Always end with a synthesize step."""</span>
+
+<span class="cls">REFLECTION_INSTRUCTIONS</span> = <span class="str">"""You are a critical reasoning agent. Evaluate evidence completeness.
+Respond ONLY with JSON:
+{ "isComplete": bool, "confidenceScore": 0.0-1.0, "gapAnalysis": str|null,
+  "suggestedAction": str|null, "finalAnswer": str|null }
+If confidence >= 0.8: isComplete=true + finalAnswer. Else: explain gaps."""</span>
+</code></pre>
+</section>
+
+<!-- ═══════════════ 16. HOSTING ══════════════════ -->
+<section id="hosting">
+    <h2>16. Hosting &amp; API — app.py</h2>
+
+    <p>
+        The Agent Framework's hosting adapter turns the agent into an HTTP server compatible with the
+        <strong>OpenAI Responses API</strong> on port <strong>8088</strong>. One line of code — no
+        FastAPI, Flask, or ASP.NET needed.
+    </p>
+
+    <h3>app.py — Main Entrypoint</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> asyncio
+<span class="kw">import</span> os
+<span class="kw">import</span> logging
+<span class="kw">from</span> dotenv <span class="kw">import</span> load_dotenv
+
+load_dotenv(override=<span class="kw">False</span>)  <span class="cmt"># Foundry runtime env vars take precedence</span>
+
+logging.<span class="fn">basicConfig</span>(level=logging.INFO)
+logger = logging.<span class="fn">getLogger</span>(__name__)
+
+<span class="kw">from</span> agent_framework.azure <span class="kw">import</span> AzureAIClient
+<span class="kw">from</span> azure.ai.agentserver.agentframework <span class="kw">import</span> from_agent_framework
+<span class="kw">from</span> azure.identity.aio <span class="kw">import</span> DefaultAzureCredential
+<span class="kw">from</span> azure.ai.projects <span class="kw">import</span> AIProjectClient
+<span class="kw">from</span> azure.ai.agents.models <span class="kw">import</span> (
+    AzureAISearchToolDefinition, AzureAISearchToolResource,
+    AISearchIndexResource, AzureAISearchQueryType,
+    FunctionTool, ToolSet, WebSearchPreviewTool,
+)
+
+<span class="kw">from</span> tools.doc_intelligence <span class="kw">import</span> extract_document
+<span class="kw">from</span> tools.sql_server <span class="kw">import</span> query_sql
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    credential = DefaultAzureCredential()
+
+    <span class="cmt"># Resolve AI Search connection</span>
+    project_client = AIProjectClient(
+        endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        credential=credential,
+    )
+    search_conn = project_client.connections.<span class="fn">get</span>(
+        os.getenv(<span class="str">"AZURE_AI_SEARCH_CONNECTION_NAME"</span>)
+    )
+
+    <span class="cmt"># Built-in tools</span>
+    ai_search_tool = AzureAISearchToolDefinition(
+        azure_ai_search=AzureAISearchToolResource(indexes=[
+            AISearchIndexResource(
+                index_connection_id=search_conn.id,
+                index_name=os.getenv(<span class="str">"AI_SEARCH_INDEX_NAME"</span>),
+                query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
+            ),
+        ])
+    )
+    web_search_tool = WebSearchPreviewTool()
+
+    <span class="cmt"># Custom FunctionTools</span>
+    custom_tools = FunctionTool([extract_document, query_sql])
+    toolset = ToolSet()
+    toolset.<span class="fn">add</span>(custom_tools)
+
+    <span class="cmt"># Create the main agent with ALL tools + memory</span>
+    <span class="kw">async with</span> AzureAIClient(
+        project_endpoint=os.getenv(<span class="str">"FOUNDRY_PROJECT_ENDPOINT"</span>),
+        model_deployment_name=os.getenv(<span class="str">"FOUNDRY_MODEL_DEPLOYMENT_NAME"</span>),
+        credential=credential,
+    ).<span class="fn">as_agent</span>(
+        name=<span class="str">"AgenticRag"</span>,
+        instructions=<span class="str">"""You are an intelligent Agentic RAG assistant with access to:
+1. Azure AI Search (internal documents — hybrid vector + keyword search)
+2. Web Search (real-time internet information)
+3. Document extraction (PDF and image OCR)
+4. SQL Server queries (structured data — read-only)
+5. Long-term memory (past conversations and user preferences)
+
+Strategy:
+- Check memory first for relevant context
+- Search internal documents before trying web search
+- Use SQL for structured/numerical data
+- Use document extraction only for specific files
+- Provide citations and source references
+- If unsure, explain what you know and what's missing"""</span>,
+        tools=[ai_search_tool, web_search_tool],
+        toolset=toolset,
+        memory_store=<span class="str">"rag-memory"</span>,
+    ) <span class="kw">as</span> agent:
+        logger.<span class="fn">info</span>(<span class="str">"Starting Agentic RAG on port 8088..."</span>)
+        <span class="cmt"># One line → HTTP server compatible with Foundry Responses API</span>
+        <span class="kw">await</span> <span class="fn">from_agent_framework</span>(agent).<span class="fn">run_async</span>()
+
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    asyncio.<span class="fn">run</span>(<span class="fn">main</span>())
+</code></pre>
+
+    <h3>Dockerfile</h3>
+<pre><span class="lang">Dockerfile</span>
+<code>FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+EXPOSE 8088
+
+CMD ["python", "app.py"]
+</code></pre>
+
+    <div class="callout callout-warning">
+        <strong>Build for linux/amd64:</strong> Foundry hosted agents run on Linux AMD64 infrastructure.
+        Build with <code>docker build --platform linux/amd64 -t agentic-rag .</code>
+    </div>
+
+    <h3>API (Automatic — OpenAI Responses Schema)</h3>
+    <p>
+        The hosting adapter automatically exposes the <strong>OpenAI Responses API</strong> at
+        <code>POST /responses</code>. No manual endpoint wiring needed.
+    </p>
+<pre><span class="lang">Bash</span>
+<code># Send a question
+curl -X POST http://localhost:8088/responses \
+  -H "Content-Type: application/json" \
+  -d '{"input": "What were our Q3 sales figures?"}'
+
+# The response follows the OpenAI Responses API format
+</code></pre>
+</section>
+
+<!-- ═══════════════ 17. INGESTION ══════════════════ -->
+<section id="ingestion">
+    <h2>17. Data Ingestion</h2>
+
+    <h3>ingestion/ingest.py</h3>
+<pre><span class="lang">Python</span>
+<code><span class="kw">import</span> os
+<span class="kw">import</span> uuid
+<span class="kw">from</span> azure.search.documents <span class="kw">import</span> SearchClient
+<span class="kw">from</span> azure.search.documents.indexes <span class="kw">import</span> SearchIndexClient
+<span class="kw">from</span> azure.search.documents.indexes.models <span class="kw">import</span> (
+    SearchIndex, SearchField, SearchFieldDataType,
+    SimpleField, SearchableField, VectorSearch,
+    HnswAlgorithmConfiguration, VectorSearchProfile,
+)
+<span class="kw">from</span> azure.core.credentials <span class="kw">import</span> AzureKeyCredential
+<span class="kw">from</span> openai <span class="kw">import</span> AzureOpenAI
+<span class="kw">from</span> tools.doc_intelligence <span class="kw">import</span> extract_document
+
+
+<span class="kw">def</span> <span class="fn">create_index</span>(index_client: SearchIndexClient, index_name: <span class="cls">str</span>):
+    <span class="str">"""Create the Azure AI Search index with vector support."""</span>
+    fields = [
+        SimpleField(name=<span class="str">"id"</span>, type=SearchFieldDataType.String, key=<span class="kw">True</span>),
+        SearchableField(name=<span class="str">"content"</span>, analyzer_name=<span class="str">"en.microsoft"</span>),
+        SimpleField(name=<span class="str">"source"</span>, type=SearchFieldDataType.String, filterable=<span class="kw">True</span>),
+        SimpleField(name=<span class="str">"title"</span>, type=SearchFieldDataType.String),
+        SearchField(
+            name=<span class="str">"content_vector"</span>,
+            type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
+            searchable=<span class="kw">True</span>, vector_search_dimensions=<span class="num">3072</span>,
+            vector_search_profile_name=<span class="str">"hnsw-profile"</span>,
+        ),
+    ]
+    vector_search = VectorSearch(
+        algorithms=[HnswAlgorithmConfiguration(name=<span class="str">"hnsw-config"</span>)],
+        profiles=[VectorSearchProfile(name=<span class="str">"hnsw-profile"</span>, algorithm_configuration_name=<span class="str">"hnsw-config"</span>)],
+    )
+    index = SearchIndex(name=index_name, fields=fields, vector_search=vector_search)
+    index_client.<span class="fn">create_or_update_index</span>(index)
+
+
+<span class="kw">def</span> <span class="fn">chunk_text</span>(text: <span class="cls">str</span>, size: <span class="cls">int</span> = <span class="num">1000</span>, overlap: <span class="cls">int</span> = <span class="num">200</span>) -> list[<span class="cls">str</span>]:
+    chunks, start = [], <span class="num">0</span>
+    <span class="kw">while</span> start &lt; <span class="fn">len</span>(text):
+        chunks.<span class="fn">append</span>(text[start : start + size])
+        start += size - overlap
+    <span class="kw">return</span> chunks
+
+
+<span class="kw">def</span> <span class="fn">ingest_file</span>(file_path: <span class="cls">str</span>):
+    <span class="str">"""Extract text from a file, chunk, embed, and upload to Azure AI Search."""</span>
+    oai = AzureOpenAI(
+        azure_endpoint=os.getenv(<span class="str">"AZURE_OPENAI_ENDPOINT"</span>),
+        api_key=os.getenv(<span class="str">"AZURE_OPENAI_KEY"</span>),
+        api_version=<span class="str">"2024-10-21"</span>,
+    )
+    search_cred = AzureKeyCredential(os.getenv(<span class="str">"SEARCH_API_KEY"</span>))
+    index_name = os.getenv(<span class="str">"AI_SEARCH_INDEX_NAME"</span>)
+
+    <span class="cmt"># Create index if needed</span>
+    idx_client = SearchIndexClient(os.getenv(<span class="str">"SEARCH_ENDPOINT"</span>), search_cred)
+    <span class="fn">create_index</span>(idx_client, index_name)
+
+    <span class="cmt"># Extract + chunk</span>
+    text = <span class="fn">extract_document</span>(file_path)
+    chunks = <span class="fn">chunk_text</span>(text)
+
+    <span class="cmt"># Embed + upload</span>
+    docs = []
+    <span class="kw">for</span> i, chunk <span class="kw">in</span> <span class="fn">enumerate</span>(chunks):
+        resp = oai.embeddings.<span class="fn">create</span>(
+            input=chunk, model=os.getenv(<span class="str">"EMBEDDING_DEPLOYMENT"</span>), dimensions=<span class="num">3072</span>
+        )
+        docs.<span class="fn">append</span>({
+            <span class="str">"id"</span>: uuid.<span class="fn">uuid4</span>().hex,
+            <span class="str">"content"</span>: chunk,
+            <span class="str">"source"</span>: file_path,
+            <span class="str">"title"</span>: <span class="str">f"</span>{os.path.<span class="fn">basename</span>(file_path)}<span class="str"> - chunk </span>{i + <span class="num">1</span>}<span class="str">"</span>,
+            <span class="str">"content_vector"</span>: resp.data[<span class="num">0</span>].embedding,
+        })
+
+    search_client = SearchClient(os.getenv(<span class="str">"SEARCH_ENDPOINT"</span>), index_name, search_cred)
+    <span class="kw">for</span> batch <span class="kw">in</span> [docs[i:i+<span class="num">100</span>] <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">0</span>, <span class="fn">len</span>(docs), <span class="num">100</span>)]:
+        search_client.<span class="fn">upload_documents</span>(batch)
+
+    <span class="fn">print</span>(<span class="str">f"Ingested </span>{<span class="fn">len</span>(docs)}<span class="str"> chunks from </span>{file_path}<span class="str">"</span>)
+</code></pre>
+</section>
+
+<!-- ═══════════════ 18. WALKTHROUGH ══════════════════ -->
+<section id="walkthrough">
+    <h2>18. End-to-End Walkthrough</h2>
+    <p>User asks: <em>"Compare Q3 and Q4 revenue from our finance reports and check SQL for discrepancies"</em></p>
+
+    <div class="timeline">
+        <div class="tl-step" data-step="1">
+            <h4>Semantic Cache Check</h4>
+            <p>Embed question → HNSW search in Redis → cosine similarity 0.71 → <strong>cache miss</strong>.</p>
+        </div>
+        <div class="tl-step" data-step="2">
+            <h4>Agent Memory Recall (Built-in)</h4>
+            <p>Memory automatically surfaces: "User discussed Q2 revenue last month ($2.3M)". No custom code needed.</p>
+        </div>
+        <div class="tl-step" data-step="3">
+            <h4>Planner Agent</h4>
+            <p>GPT-4o generates 5-step plan: memory_recall → search_knowledge_base × 2 → query_sql → synthesize.</p>
+        </div>
+        <div class="tl-step" data-step="4">
+            <h4>Executor Agent — Iteration 1</h4>
+            <p><code>AzureAISearchAgentTool</code> finds Q3 data. Q4 not in index. <code>FunctionTool(query_sql)</code> returns both quarters.</p>
+        </div>
+        <div class="tl-step" data-step="5">
+            <h4>Reflection Agent — Confidence: 0.65</h4>
+            <p>Gap: "Q4 document not in knowledge base." Suggested: "Try web_search for Q4 2025 revenue."</p>
+        </div>
+        <div class="tl-step" data-step="6">
+            <h4>Re-Plan + Execute — Iteration 2</h4>
+            <p><code>WebSearchPreviewTool</code> finds Q4 data. All sources now available.</p>
+        </div>
+        <div class="tl-step" data-step="7">
+            <h4>Reflection Agent — Confidence: 0.91 ✅</h4>
+            <p>"Q3 = $2.8M, Q4 = $3.1M (11% growth). SQL matches documents. No discrepancies found."</p>
+        </div>
+        <div class="tl-step" data-step="8">
+            <h4>Save &amp; Respond</h4>
+            <p>Cache answer in Redis. Memory auto-stores "Q3=$2.8M, Q4=$3.1M" for future sessions. Return to user.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 19. DEPLOYMENT ══════════════════ -->
+<section id="deploy">
+    <h2>19. Deployment</h2>
+
+    <h3>19.1 Run Locally</h3>
+<pre><span class="lang">Bash</span>
+<code># Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the agent (starts HTTP server on localhost:8088)
+python app.py
+
+# Test
+curl -X POST http://localhost:8088/responses \
+  -H "Content-Type: application/json" \
+  -d '{"input": "What were our Q3 sales?"}'
+</code></pre>
+
+    <h3>19.2 Deploy to Azure AI Foundry</h3>
+    <table>
+        <thead><tr><th>Step</th><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td><code>docker build --platform linux/amd64 -t agentic-rag .</code></td><td>Build container (must be linux/amd64)</td></tr>
+            <tr><td>2</td><td><code>az acr build --registry &lt;acr&gt; -t agentic-rag:latest .</code></td><td>Push to Azure Container Registry</td></tr>
+            <tr><td>3</td><td>Foundry MCP: <code>agent_update</code></td><td>Register as Foundry hosted agent</td></tr>
+            <tr><td>4</td><td>Foundry MCP: <code>container_start</code></td><td>Start the agent container</td></tr>
+            <tr><td>5</td><td>Foundry MCP: <code>agent_invoke</code></td><td>Test with a message</td></tr>
+            <tr><td>6</td><td>Foundry: batch evaluation</td><td>Run quality evaluation on test dataset</td></tr>
+        </tbody>
+    </table>
+
+    <h3>19.3 Azure Resources Setup</h3>
+<pre><span class="lang">Bash</span>
+<code># Resource Group
+az group create -n rg-agentic-rag -l eastus
+
+# Azure AI Foundry Project (includes OpenAI, AI Search connections)
+# → Create via Azure Portal or Azure AI Foundry Studio
+
+# Deploy models in Foundry
+# → GPT-4o + text-embedding-3-large
+
+# Azure Document Intelligence
+az cognitiveservices account create -n docintel-rag -g rg-agentic-rag \
+    --kind FormRecognizer --sku S0 -l eastus
+
+# Azure Cache for Redis (Enterprise with RediSearch)
+az redis create -n redis-rag -g rg-agentic-rag --sku Enterprise_E10 -l eastus
+
+# SQL Server (if needed)
+az sql server create -n sql-rag -g rg-agentic-rag -l eastus \
+    --admin-user sqladmin --admin-password '&lt;StrongPassword&gt;'
+</code></pre>
+</section>
+
+<!-- ═══════════════ 20. SECURITY ══════════════════ -->
+<section id="security">
+    <h2>20. Security Considerations</h2>
+    <table>
+        <thead><tr><th>Area</th><th>Measure</th><th>Implementation</th></tr></thead>
+        <tbody>
+            <tr><td>SQL Injection</td><td>Query allowlisting</td><td>Only SELECT allowed; BLOCKED_KEYWORDS set blocks all write/DDL ops</td></tr>
+            <tr><td>Credentials</td><td>Managed Identity</td><td><code>DefaultAzureCredential</code> for local dev; <code>ManagedIdentityCredential</code> in production</td></tr>
+            <tr><td>Tool Input Safety</td><td>Treat as untrusted</td><td>All FunctionTool inputs treated as untrusted; validated before execution</td></tr>
+            <tr><td>Data Access</td><td>Read-only tools</td><td>No write operations exposed to the agent — all tools are read-only</td></tr>
+            <tr><td>Redis</td><td>TLS encryption</td><td><code>rediss://</code> protocol; password authentication</td></tr>
+            <tr><td>Memory Isolation</td><td>User-scoped partitioning</td><td>Memory <code>scope</code> parameter ensures per-user isolation</td></tr>
+            <tr><td>Web Search</td><td>Result validation</td><td>Web search results treated as untrusted external input</td></tr>
+            <tr><td>Env Variables</td><td>Foundry runtime injection</td><td><code>load_dotenv(override=False)</code> — Foundry env vars take precedence</td></tr>
+            <tr><td>Agent Naming</td><td>Input validation</td><td>Alphanumeric + hyphens, start/end alphanumeric, max 63 chars</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-warning">
+        <strong>Production Recommendations:</strong>
+        Use <code>ManagedIdentityCredential</code> (not DefaultAzureCredential) in production.
+        Assign RBAC roles (Search Index Data Contributor, Azure AI User) to the project managed identity.
+        Enable Azure Content Safety to filter harmful inputs/outputs.
+    </div>
+</section>
+
+<!-- ═══════════════ SUMMARY ══════════════════ -->
+<section>
+    <h2>21. Summary</h2>
+    <table>
+        <thead><tr><th>Feature</th><th>Technology</th><th>Custom Code?</th></tr></thead>
+        <tbody>
+            <tr><td>Agent Orchestration</td><td>Agent Framework + WorkflowBuilder</td><td>No — built-in graph engine</td></tr>
+            <tr><td>Azure AI Search (Hybrid)</td><td><code>AzureAISearchAgentTool</code></td><td>No — 3 lines config</td></tr>
+            <tr><td>Web Search</td><td><code>WebSearchPreviewTool</code></td><td>No — zero config</td></tr>
+            <tr><td>Long-term Memory</td><td>Foundry Agent Memory</td><td>No — managed service</td></tr>
+            <tr><td>Short-term Memory</td><td>Agent conversation threads</td><td>No — built-in</td></tr>
+            <tr><td>Planning</td><td>Planner agent in workflow graph</td><td>Prompt only — no plumbing</td></tr>
+            <tr><td>Reasoning</td><td>Reflection agent with loop-back edge</td><td>Prompt only — no plumbing</td></tr>
+            <tr><td>Semantic Cache</td><td>Redis Enterprise + HNSW</td><td>Yes — ~80 lines</td></tr>
+            <tr><td>PDF / Image Extraction</td><td><code>FunctionTool</code> + Document Intelligence</td><td>Yes — ~40 lines</td></tr>
+            <tr><td>SQL Server</td><td><code>FunctionTool</code> + pyodbc</td><td>Yes — ~35 lines</td></tr>
+            <tr><td>HTTP Server</td><td><code>from_agent_framework</code> adapter</td><td>No — one line</td></tr>
+            <tr><td>Deployment</td><td>Foundry Hosted Agent + Docker</td><td>Dockerfile + agent.yaml</td></tr>
+            <tr><td>Evaluation</td><td>Foundry batch eval + prompt optimizer</td><td>No — managed</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-success">
+        <strong>Bottom Line:</strong> By using the Microsoft Agent Framework instead of Semantic Kernel,
+        we eliminated ~70% of custom infrastructure code. Built-in tools for AI Search, Web Search,
+        and Memory mean we only write custom code for Document Intelligence, SQL Server, and the
+        Redis semantic cache. The hosting adapter gives us a production-ready HTTP server in one line,
+        and Foundry provides deployment, evaluation, and observability out of the box.
+    </div>
+</section>
+
+</div>
+
+<footer>
+    <p>
+        <strong>Agentic RAG System</strong> — Built with the Microsoft Agent Framework &amp; Azure AI Foundry<br>
+        Python 3.12 &bull; GPT-4o &bull; Azure AI Search &bull; Agent Memory &bull; WebSearchPreviewTool &bull; Document Intelligence &bull; Redis Enterprise
+    </p>
+    <p>
+        <a href="https://github.com/microsoft/agent-framework" target="_blank">Agent Framework GitHub</a> &bull;
+        <a href="https://learn.microsoft.com/agent-framework/" target="_blank">Agent Framework Docs</a> &bull;
+        <a href="https://learn.microsoft.com/azure/ai-foundry/" target="_blank">Azure AI Foundry Docs</a>
+    </p>
+</footer>
+
+</body>
+</html>
