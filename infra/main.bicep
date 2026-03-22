@@ -145,6 +145,16 @@ resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@202
   }
 }
 
+resource searchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appPrincipalId)) {
+  name: guid(aiSearch.outputs.id, appPrincipalId, '7ca78c08-252a-4471-8644-bb5ff32d4ba0')
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7ca78c08-252a-4471-8644-bb5ff32d4ba0') // Search Service Contributor
+    principalId: appPrincipalId
+    principalType: appPrincipalType
+  }
+}
+
 resource searchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appPrincipalId)) {
   name: guid(aiSearch.outputs.id, appPrincipalId, '1407120a-92aa-4202-b7e9-c0e197c71c8f')
   scope: resourceGroup()
