@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AgenticRag")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f94e3f8a01f0dab3877b98188d17def19c2d88e0")]
 [assembly: System.Reflection.AssemblyProductAttribute("AgenticRag")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AgenticRag")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

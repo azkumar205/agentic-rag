@@ -32,6 +32,13 @@ param gpt4oVersion string = '2024-08-06'
 @description('Azure OpenAI embedding model version')
 param embeddingVersion string = '2024-02-01'
 
+@description('Principal ID (object ID) of the identity that will run the application (e.g., your user, managed identity, or service principal). Used to assign RBAC roles for Search and OpenAI access.')
+param appPrincipalId string = ''
+
+@description('Principal type for the appPrincipalId. Use "User" for interactive developer logins (az ad signed-in-user), "ServicePrincipal" for managed identities and service principals.')
+@allowed(['User', 'ServicePrincipal', 'Group'])
+param appPrincipalType string = 'User'
+
 // ─── Variables ─────────────────────────────────────
 var uniqueSuffix = uniqueString(resourceGroup().id, baseName)
 var names = {
@@ -116,6 +123,45 @@ module acr 'modules/container-registry.bicep' = {
   params: {
     name: names.acr
     location: location
+  }
+}
+
+// ─── RBAC Role Assignments (optional — requires appPrincipalId to be set) ───
+// These roles are required for the full ingestion pipeline:
+//   - Search Index Data Contributor: create/update the rag-index and upload documents
+//   - Search Service Contributor:    manage index schema (CreateOrUpdateIndex)
+//   - Cognitive Services OpenAI User: call Azure OpenAI embedding and chat APIs
+//
+// For developer login:       appPrincipalId=$(az ad signed-in-user show --query id -o tsv)  appPrincipalType=User
+// For managed identity:      appPrincipalId=<managed-identity-object-id>                   appPrincipalType=ServicePrincipal
+
+resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appPrincipalId)) {
+  name: guid(aiSearch.outputs.id, appPrincipalId, '8ebe5a00-799e-43f5-93ac-243d3dce84a7')
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8ebe5a00-799e-43f5-93ac-243d3dce84a7') // Search Index Data Contributor
+    principalId: appPrincipalId
+    principalType: appPrincipalType
+  }
+}
+
+resource searchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appPrincipalId)) {
+  name: guid(aiSearch.outputs.id, appPrincipalId, '1407120a-92aa-4202-b7e9-c0e197c71c8f')
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '1407120a-92aa-4202-b7e9-c0e197c71c8f') // Search Index Data Reader
+    principalId: appPrincipalId
+    principalType: appPrincipalType
+  }
+}
+
+resource openAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appPrincipalId)) {
+  name: guid(openai.outputs.id, appPrincipalId, '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd') // Cognitive Services OpenAI User
+    principalId: appPrincipalId
+    principalType: appPrincipalType
   }
 }
 

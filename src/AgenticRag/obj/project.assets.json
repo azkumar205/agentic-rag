@@ -73,12 +73,12 @@
           }
         }
       },
-      "Azure.Core/1.46.1": {
+      "Azure.Core/1.49.0": {
         "type": "package",
         "dependencies": {
           "Microsoft.Bcl.AsyncInterfaces": "8.0.0",
-          "System.ClientModel": "1.4.1",
-          "System.Memory.Data": "6.0.1"
+          "System.ClientModel": "1.7.0",
+          "System.Memory.Data": "8.0.1"
         },
         "compile": {
           "lib/net8.0/Azure.Core.dll": {
@@ -107,6 +107,22 @@
         },
         "runtime": {
           "lib/net8.0/Azure.Identity.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Azure.Search.Documents/11.7.0": {
+        "type": "package",
+        "dependencies": {
+          "Azure.Core": "1.49.0"
+        },
+        "compile": {
+          "lib/net8.0/Azure.Search.Documents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Azure.Search.Documents.dll": {
             "related": ".xml"
           }
         }
@@ -679,11 +695,11 @@
           }
         }
       },
-      "System.ClientModel/1.4.1": {
+      "System.ClientModel/1.7.0": {
         "type": "package",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "8.0.3",
-          "System.Memory.Data": "6.0.1"
+          "System.Memory.Data": "8.0.1"
         },
         "compile": {
           "lib/net8.0/System.ClientModel.dll": {
@@ -816,20 +832,20 @@
           "lib/netcoreapp2.1/_._": {}
         }
       },
-      "System.Memory.Data/6.0.1": {
+      "System.Memory.Data/8.0.1": {
         "type": "package",
         "compile": {
-          "lib/net6.0/System.Memory.Data.dll": {
+          "lib/net8.0/System.Memory.Data.dll": {
             "related": ".xml"
           }
         },
         "runtime": {
-          "lib/net6.0/System.Memory.Data.dll": {
+          "lib/net8.0/System.Memory.Data.dll": {
             "related": ".xml"
           }
         },
         "build": {
-          "buildTransitive/netcoreapp3.1/_._": {}
+          "buildTransitive/net6.0/_._": {}
         }
       },
       "System.Numerics.Tensors/8.0.0": {
@@ -1074,24 +1090,22 @@
         "lib/netstandard2.0/Azure.AI.Projects.xml"
       ]
     },
-    "Azure.Core/1.46.1": {
-      "sha512": "iE5DPOlGsN5kCkF4gN+vasN1RihO0Ypie92oQ5tohQYiokmnrrhLnee+3zcE8n7vB6ZAzhPTfUGAEXX/qHGkYA==",
+    "Azure.Core/1.49.0": {
+      "sha512": "wmY5VEEVTBJN+8KVB6qSVZYDCMpHs1UXooOijx/NH7OsMtK92NlxhPBpPyh4cR+07R/zyDGvA5+Fss4TpwlO+g==",
       "type": "package",
-      "path": "azure.core/1.46.1",
+      "path": "azure.core/1.49.0",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "CHANGELOG.md",
         "README.md",
-        "azure.core.1.46.1.nupkg.sha512",
+        "azure.core.1.49.0.nupkg.sha512",
         "azure.core.nuspec",
         "azureicon.png",
         "lib/net462/Azure.Core.dll",
         "lib/net462/Azure.Core.xml",
         "lib/net472/Azure.Core.dll",
         "lib/net472/Azure.Core.xml",
-        "lib/net6.0/Azure.Core.dll",
-        "lib/net6.0/Azure.Core.xml",
         "lib/net8.0/Azure.Core.dll",
         "lib/net8.0/Azure.Core.xml",
         "lib/netstandard2.0/Azure.Core.dll",
@@ -1114,6 +1128,24 @@
         "lib/net8.0/Azure.Identity.xml",
         "lib/netstandard2.0/Azure.Identity.dll",
         "lib/netstandard2.0/Azure.Identity.xml"
+      ]
+    },
+    "Azure.Search.Documents/11.7.0": {
+      "sha512": "48yBLnsf8SSgowe/OQDCNg9+G9WjzRmLX6Bghjlshxu+5Mhh4maTXvSWKi4o568ZqV6GoOYhiKPbCm/QYoufwA==",
+      "type": "package",
+      "path": "azure.search.documents/11.7.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "CHANGELOG.md",
+        "README.md",
+        "azure.search.documents.11.7.0.nupkg.sha512",
+        "azure.search.documents.nuspec",
+        "azureicon.png",
+        "lib/net8.0/Azure.Search.Documents.dll",
+        "lib/net8.0/Azure.Search.Documents.xml",
+        "lib/netstandard2.0/Azure.Search.Documents.dll",
+        "lib/netstandard2.0/Azure.Search.Documents.xml"
       ]
     },
     "Azure.Storage.Blobs/12.23.0": {
@@ -2018,10 +2050,10 @@
         "stackexchange.redis.nuspec"
       ]
     },
-    "System.ClientModel/1.4.1": {
-      "sha512": "MY7eFGKp+Hu7Ciub8wigQ0odGrkml4eTjUy8d5Bu2eGAVvm8Qskkq+YuXiiS5wMJGq7iSvqseV4skd5WxTUdDA==",
+    "System.ClientModel/1.7.0": {
+      "sha512": "NKKA3/O6B7PxmtIzOifExHdfoWthy3AD4EZ1JfzcZU8yGZTbYrK1qvXsHUL/1yQKKqWSKgIR1Ih/yf2gOaHc4w==",
       "type": "package",
-      "path": "system.clientmodel/1.4.1",
+      "path": "system.clientmodel/1.7.0",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -2029,13 +2061,13 @@
         "DotNetPackageIcon.png",
         "README.md",
         "analyzers/dotnet/cs/System.ClientModel.SourceGeneration.dll",
-        "lib/net6.0/System.ClientModel.dll",
-        "lib/net6.0/System.ClientModel.xml",
         "lib/net8.0/System.ClientModel.dll",
         "lib/net8.0/System.ClientModel.xml",
+        "lib/net9.0/System.ClientModel.dll",
+        "lib/net9.0/System.ClientModel.xml",
         "lib/netstandard2.0/System.ClientModel.dll",
         "lib/netstandard2.0/System.ClientModel.xml",
-        "system.clientmodel.1.4.1.nupkg.sha512",
+        "system.clientmodel.1.7.0.nupkg.sha512",
         "system.clientmodel.nuspec"
       ]
     },
@@ -2228,25 +2260,32 @@
         "version.txt"
       ]
     },
-    "System.Memory.Data/6.0.1": {
-      "sha512": "yliDgLh9S9Mcy5hBIdZmX6yphYIW3NH+3HN1kV1m7V1e0s7LNTw/tHNjJP4U9nSMEgl3w1TzYv/KA1Tg9NYy6w==",
+    "System.Memory.Data/8.0.1": {
+      "sha512": "BVYuec3jV23EMRDeR7Dr1/qhx7369dZzJ9IWy2xylvb4YfXsrUxspWc4UWYid/tj4zZK58uGZqn2WQiaDMhmAg==",
       "type": "package",
-      "path": "system.memory.data/6.0.1",
+      "path": "system.memory.data/8.0.1",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "Icon.png",
         "LICENSE.TXT",
+        "PACKAGE.md",
         "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Memory.Data.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
         "buildTransitive/netcoreapp2.0/System.Memory.Data.targets",
-        "buildTransitive/netcoreapp3.1/_._",
-        "lib/net461/System.Memory.Data.dll",
-        "lib/net461/System.Memory.Data.xml",
+        "lib/net462/System.Memory.Data.dll",
+        "lib/net462/System.Memory.Data.xml",
         "lib/net6.0/System.Memory.Data.dll",
         "lib/net6.0/System.Memory.Data.xml",
+        "lib/net7.0/System.Memory.Data.dll",
+        "lib/net7.0/System.Memory.Data.xml",
+        "lib/net8.0/System.Memory.Data.dll",
+        "lib/net8.0/System.Memory.Data.xml",
         "lib/netstandard2.0/System.Memory.Data.dll",
         "lib/netstandard2.0/System.Memory.Data.xml",
-        "system.memory.data.6.0.1.nupkg.sha512",
+        "system.memory.data.8.0.1.nupkg.sha512",
         "system.memory.data.nuspec",
         "useSharedDesignerContext.txt"
       ]
@@ -2729,6 +2768,7 @@
       "Azure.AI.OpenAI >= 2.1.0",
       "Azure.AI.Projects >= 1.0.0-beta.9",
       "Azure.Identity >= 1.13.2",
+      "Azure.Search.Documents >= 11.7.0",
       "Microsoft.Data.SqlClient >= 5.2.2",
       "Microsoft.Extensions.Configuration >= 8.0.0",
       "Microsoft.Extensions.Configuration.EnvironmentVariables >= 8.0.0",
@@ -2738,19 +2778,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\taran\\.nuget\\packages\\": {}
+    "/tmp/codeql-scratch-eaccae2829fc2b2c/dbs/csharp/working/packages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\RAG\\Agentic RAG\\src\\AgenticRag\\AgenticRag.csproj",
+      "projectUniqueName": "/home/runner/work/agentic-rag/agentic-rag/src/AgenticRag/AgenticRag.csproj",
       "projectName": "AgenticRag",
-      "projectPath": "E:\\RAG\\Agentic RAG\\src\\AgenticRag\\AgenticRag.csproj",
-      "packagesPath": "C:\\Users\\taran\\.nuget\\packages\\",
-      "outputPath": "E:\\RAG\\Agentic RAG\\src\\AgenticRag\\obj\\",
+      "projectPath": "/home/runner/work/agentic-rag/agentic-rag/src/AgenticRag/AgenticRag.csproj",
+      "packagesPath": "/tmp/codeql-scratch-eaccae2829fc2b2c/dbs/csharp/working/packages",
+      "outputPath": "/home/runner/work/agentic-rag/agentic-rag/src/AgenticRag/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\taran\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "/home/runner/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -2796,6 +2836,10 @@
             "target": "Package",
             "version": "[1.13.2, )"
           },
+          "Azure.Search.Documents": {
+            "target": "Package",
+            "version": "[11.7.0, )"
+          },
           "Microsoft.Data.SqlClient": {
             "target": "Package",
             "version": "[5.2.2, )"
@@ -2838,15 +2882,11 @@
             "version": "[8.0.23, 8.0.23]"
           },
           {
-            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "name": "Microsoft.NETCore.App.Host.linux-x64",
             "version": "[8.0.23, 8.0.23]"
           },
           {
             "name": "Microsoft.NETCore.App.Ref",
-            "version": "[8.0.23, 8.0.23]"
-          },
-          {
-            "name": "Microsoft.WindowsDesktop.App.Ref",
             "version": "[8.0.23, 8.0.23]"
           }
         ],
@@ -2858,7 +2898,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.102/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
