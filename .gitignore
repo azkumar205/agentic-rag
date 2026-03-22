@@ -1,0 +1,22 @@
+# .NET build outputs
+bin/
+obj/
+
+# User secrets and local settings
+appsettings.Development.json
+secrets.json
+*.user
+
+# VS / Rider IDE files
+.vs/
+.idea/
+*.suo
+*.user
+
+# NuGet
+*.nupkg
+.nuget/
+
+# OS files
+.DS_Store
+Thumbs.db
