@@ -126,6 +126,19 @@
         .prereq-step .scontent p { margin: 0; font-size: .9rem; color: var(--text-muted); }
         .prereq-step .scontent code { font-size: .85rem; }
 
+        /* ── Phase Groups ─────────── */
+        .phase-group { margin: 32px 0; border: 2px solid var(--border); border-radius: 14px; overflow: hidden; }
+        .phase-header { display: flex; align-items: center; gap: 16px; background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 16px 24px; }
+        .phase-header .phase-num { flex-shrink: 0; width: 44px; height: 44px; background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
+        .phase-header .phase-title { font-size: 1.15rem; font-weight: 700; margin: 0; }
+        .phase-header .phase-sub { font-size: .85rem; opacity: .85; margin: 2px 0 0; }
+        .phase-body { padding: 24px; background: var(--card-bg); }
+        .phase-body > h4 { font-size: 1rem; color: var(--primary-dark); margin: 20px 0 8px; padding-left: 10px; border-left: 3px solid var(--accent); }
+        .phase-body > h4:first-child { margin-top: 0; }
+        .phase-body .prereq-steps { margin: 8px 0 0; }
+        .step-badge { display: inline-flex; align-items: center; gap: 6px; background: #e8f4fd; color: var(--primary-dark); border: 1px solid var(--primary); border-radius: 20px; padding: 2px 10px; font-size: .78rem; font-weight: 600; margin-bottom: 10px; }
+        .step-badge .sb-icon { font-size: .95rem; }
+
         footer { background: #1e293b; color: #94a3b8; text-align: center; padding: 30px; font-size: .85rem; }
         footer a { color: var(--accent); text-decoration: none; }
         @media (max-width: 768px) { .hero h1 { font-size: 2rem; } .compare { grid-template-columns: 1fr; } .hero { padding: 48px 20px; } .container { padding: 24px 16px; } }
@@ -363,111 +376,673 @@
 
 <!-- ═══════════════ 4. BEGINNER SETUP ══════════════════ -->
 <section id="beginner-setup">
-    <h2>4. Beginner Setup — Step-by-Step Prerequisites</h2>
+    <h2>4. Beginner Setup — Step-by-Step: Zero to Production</h2>
+
     <p>
-        Follow these steps in order. Each step is a one-time setup. After completing them,
-        you can run the application locally in under 10 minutes.
+        This section is your complete, book-quality playbook. Follow every phase in order —
+        from installing tools on a fresh machine, to having a fully deployed production system
+        with an automated GitHub Actions CI/CD pipeline. No prior Azure experience required.
     </p>
 
-    <div class="prereq-steps">
-        <div class="prereq-step">
-            <div class="snum">1</div>
-            <div class="scontent">
-                <h4>Install .NET 8 SDK</h4>
-                <p>Download from <a href="https://dotnet.microsoft.com/download/dotnet/8.0" target="_blank">dotnet.microsoft.com</a>.
-                Verify with: <code>dotnet --version</code> (should show 8.x.x).</p>
+    <div class="callout callout-info">
+        <strong>📖 How to read this section:</strong>
+        Six phases, executed top to bottom.
+        <strong>Phase 0</strong> — install tools once.
+        <strong>Phase 1</strong> — create every Azure resource with a single Bicep command.
+        <strong>Phase 2</strong> — wire the .NET app to those resources.
+        <strong>Phase 3</strong> — run the app locally.
+        <strong>Phase 4</strong> — run the ingestion pipeline (load your documents).
+        <strong>Phase 5</strong> — run the query pipeline (ask questions).
+        <strong>Phase 6</strong> — push to production via a GitHub Actions pipeline.
+    </div>
+
+    <!-- ── PHASE 0 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">0</div>
+            <div>
+                <div class="phase-title">Prerequisites — Install Required Tools</div>
+                <div class="phase-sub">One-time machine setup · ~15 minutes</div>
             </div>
         </div>
-        <div class="prereq-step">
-            <div class="snum">2</div>
-            <div class="scontent">
-                <h4>Azure Subscription</h4>
-                <p>Need an active Azure subscription. Free trial available at <a href="https://azure.microsoft.com/free" target="_blank">azure.microsoft.com/free</a>.
-                You will create resources in steps 5–9.</p>
+        <div class="phase-body">
+
+            <div class="prereq-steps">
+                <div class="prereq-step">
+                    <div class="snum">1</div>
+                    <div class="scontent">
+                        <h4>Install .NET 8 SDK</h4>
+                        <p>Download and install from <a href="https://dotnet.microsoft.com/download/dotnet/8.0" target="_blank">dotnet.microsoft.com/download/dotnet/8.0</a>.
+                        Verify the installation:</p>
+                        <p><code>dotnet --version</code> &nbsp;→&nbsp; should print <strong>8.x.x</strong></p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">2</div>
+                    <div class="scontent">
+                        <h4>Install Azure CLI</h4>
+                        <p>Download from <a href="https://learn.microsoft.com/cli/azure/install-azure-cli" target="_blank">learn.microsoft.com/cli/azure/install-azure-cli</a>.
+                        Verify:</p>
+                        <p><code>az --version</code> &nbsp;→&nbsp; should print <strong>2.x.x</strong></p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">3</div>
+                    <div class="scontent">
+                        <h4>Install Git</h4>
+                        <p>Download from <a href="https://git-scm.com/downloads" target="_blank">git-scm.com/downloads</a>. Verify:</p>
+                        <p><code>git --version</code></p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">4</div>
+                    <div class="scontent">
+                        <h4>Install Docker Desktop</h4>
+                        <p>Required for the production container build. Download from <a href="https://www.docker.com/products/docker-desktop/" target="_blank">docker.com/products/docker-desktop</a>. Verify:</p>
+                        <p><code>docker --version</code></p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">5</div>
+                    <div class="scontent">
+                        <h4>Get an Azure Subscription</h4>
+                        <p>Sign up for a free account at <a href="https://azure.microsoft.com/free" target="_blank">azure.microsoft.com/free</a> (includes $200 credit).
+                        Note your <strong>Subscription ID</strong> from the Azure Portal — you will need it in Phase 1.</p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">6</div>
+                    <div class="scontent">
+                        <h4>Clone the Repository</h4>
+                        <p>Get the source code onto your machine:</p>
+                        <p><code>git clone https://github.com/azkumar205/agentic-rag.git</code><br>
+                        <code>cd agentic-rag</code></p>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">3</div>
-            <div class="scontent">
-                <h4>Install Azure CLI</h4>
-                <p>Run <code>az --version</code> to check. Install from <a href="https://learn.microsoft.com/cli/azure/install-azure-cli" target="_blank">Microsoft docs</a>.
-                Then login: <code>az login</code>.</p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">4</div>
-            <div class="scontent">
-                <h4>Clone the Repository</h4>
-                <p><code>git clone https://github.com/azkumar205/agentic-rag.git &amp;&amp; cd agentic-rag</code></p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">5</div>
-            <div class="scontent">
-                <h4>Create Azure Resource Group</h4>
-                <p><code>az group create --name rg-agentic-rag --location eastus</code></p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">6</div>
-            <div class="scontent">
-                <h4>Deploy Azure AI Foundry (OpenAI + AI Search)</h4>
-                <p>In Azure Portal, create an <strong>Azure AI Foundry</strong> project. Inside it, deploy:
-                <code>gpt-4o</code> (chat) and <code>text-embedding-3-large</code> (embeddings).
-                Also create an AI Search connection inside the project.</p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">7</div>
-            <div class="scontent">
-                <h4>Deploy Azure Document Intelligence</h4>
-                <p><code>az cognitiveservices account create -n docintel-rag -g rg-agentic-rag --kind FormRecognizer --sku S0 -l eastus</code></p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">8</div>
-            <div class="scontent">
-                <h4>Deploy Azure Cache for Redis (Enterprise)</h4>
-                <p>Must be <strong>Enterprise tier</strong> for RediSearch (vector index support):
-                <code>az redis create -n redis-rag -g rg-agentic-rag --sku Enterprise_E10 -l eastus</code></p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">9</div>
-            <div class="scontent">
-                <h4>Configure appsettings.json</h4>
-                <p>Open <code>src/AgenticRag/appsettings.json</code> and fill in your Azure resource endpoints.
-                See Section 9 for the full template. Never commit real credentials — use User Secrets or environment variables in production.</p>
-            </div>
-        </div>
-        <div class="prereq-step">
-            <div class="snum">10</div>
-            <div class="scontent">
-                <h4>Run Locally</h4>
-                <p><code>cd src/AgenticRag &amp;&amp; dotnet restore &amp;&amp; dotnet run</code><br>
-                API starts on <code>http://localhost:8088</code>. Test with:<br>
-                <code>curl -X POST http://localhost:8088/api/chat -H "Content-Type: application/json" -d "{\"question\":\"Hello\"}"</code></p>
-            </div>
+
         </div>
     </div>
 
-    <div class="callout callout-warning">
-        <strong>🔑 Authentication Note:</strong> The project uses <code>DefaultAzureCredential</code> from <code>Azure.Identity</code>.
-        For local development, run <code>az login</code> before starting the app — this lets <code>DefaultAzureCredential</code>
-        pick up your Azure CLI token automatically. No API keys needed in code!
-    </div>
+    <!-- ── PHASE 1 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">1</div>
+            <div>
+                <div class="phase-title">Create Azure Resources with Bicep</div>
+                <div class="phase-sub">Everything in one command · ~10 minutes to deploy</div>
+            </div>
+        </div>
+        <div class="phase-body">
 
-    <h3>User Secrets (Alternative to appsettings.json for local dev)</h3>
+            <div class="callout callout-info">
+                <strong>💡 Why Bicep?</strong>
+                Bicep is Azure's native Infrastructure-as-Code language. One <code>az deployment group create</code>
+                command provisions <em>all nine</em> Azure services — OpenAI, AI Search, Document Intelligence,
+                Redis Enterprise, SQL Server, Container Registry, App Insights, and Log Analytics — with correct
+                RBAC role assignments, in a repeatable, version-controlled way. No clicking in the portal.
+            </div>
+
+            <h4>Step 1.1 — Sign in to Azure &amp; select your subscription</h4>
 <pre><span class="lang">Bash</span>
-<code><span class="cmt"># Initialize user secrets for the project (run once)</span>
-cd src/AgenticRag
-dotnet user-secrets init
+<code><span class="cmt"># Sign in (opens browser for interactive login)</span>
+az login
 
-<span class="cmt"># Set individual secrets (never committed to git)</span>
-dotnet user-secrets set <span class="str">"AzureOpenAI:Endpoint"</span> <span class="str">"https://&lt;your-openai&gt;.openai.azure.com/"</span>
-dotnet user-secrets set <span class="str">"AzureAISearch:Endpoint"</span> <span class="str">"https://&lt;your-search&gt;.search.windows.net"</span>
-dotnet user-secrets set <span class="str">"Redis:ConnectionString"</span> <span class="str">"&lt;redis&gt;.redis.cache.windows.net:10000,password=&lt;key&gt;,ssl=True"</span>
+<span class="cmt"># List your subscriptions to find the correct ID</span>
+az account list --output table
+
+<span class="cmt"># Set the subscription you want to use</span>
+az account set --subscription <span class="str">"&lt;your-subscription-id&gt;"</span>
+
+<span class="cmt"># Confirm active subscription</span>
+az account show --query <span class="str">"{Name:name, Id:id, State:state}"</span> -o table
 </code></pre>
+
+            <h4>Step 1.2 — Create the Resource Group</h4>
+<pre><span class="lang">Bash</span>
+<code><span class="cmt"># All resources will live in this resource group</span>
+az group create \
+  --name rg-agentic-rag \
+  --location eastus
+
+<span class="cmt"># Verify it was created</span>
+az group show --name rg-agentic-rag --query <span class="str">"{Name:name, Location:location, State:properties.provisioningState}"</span> -o table
+</code></pre>
+
+            <h4>Step 1.3 — Deploy ALL Azure Resources with a Single Bicep Command</h4>
+            <p>
+                The repository includes a complete Bicep template at <code>infra/main.bicep</code>.
+                It provisions every service the application needs — OpenAI models, AI Search, Document Intelligence,
+                Redis Enterprise, SQL Server, Container Registry, Application Insights, Log Analytics — and assigns
+                the correct RBAC roles to your identity so you can run the app locally without any API keys.
+            </p>
+<pre><span class="lang">Bash — Deploy all 9 Azure services in one command</span>
+<code><span class="cmt"># Capture your Azure AD object ID (needed for RBAC role assignments)</span>
+PRINCIPAL_ID=$(az ad signed-in-user show --query id -o tsv)
+
+<span class="cmt"># Deploy everything — this will take 5–10 minutes</span>
+az deployment group create \
+  --resource-group rg-agentic-rag \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam \
+  --parameters \
+    sqlAdminUser=sqladmin \
+    sqlAdminPassword=<span class="str">'StrongP@ssw0rd!123'</span> \
+    appPrincipalId=$PRINCIPAL_ID \
+    appPrincipalType=User
+
+<span class="cmt"># Monitor deployment progress (runs in a separate terminal or wait for the above to finish)</span>
+az deployment group list --resource-group rg-agentic-rag --output table
+</code></pre>
+
+            <div class="callout callout-success">
+                <strong>✅ What the Bicep template creates:</strong>
+                Azure OpenAI (gpt-4o + text-embedding-3-large) ·
+                Azure AI Search (Standard S1) ·
+                Azure Document Intelligence (S0) ·
+                Azure Cache for Redis Enterprise (E10, RediSearch enabled) ·
+                Azure SQL Server + Database ·
+                Azure Container Registry ·
+                Application Insights + Log Analytics workspace ·
+                RBAC role assignments for your identity (Search Index Data Contributor, Search Index Data Reader, Cognitive Services OpenAI User)
+            </div>
+
+            <h4>Step 1.4 — Capture Deployment Outputs</h4>
+            <p>After the deployment completes, read out the resource endpoints. You will use these in Phase 2.</p>
+<pre><span class="lang">Bash — Read Bicep outputs into shell variables</span>
+<code><span class="cmt"># Read all outputs at once</span>
+az deployment group show \
+  --resource-group rg-agentic-rag \
+  --name main \
+  --query properties.outputs
+
+<span class="cmt"># Or capture individual values into variables</span>
+OPENAI_ENDPOINT=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.openaiEndpoint.value'</span> -o tsv)
+
+SEARCH_ENDPOINT=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.searchEndpoint.value'</span> -o tsv)
+
+DOCINTEL_ENDPOINT=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.docIntelEndpoint.value'</span> -o tsv)
+
+SQL_FQDN=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.sqlServerFqdn.value'</span> -o tsv)
+
+REDIS_HOST=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.redisHostName.value'</span> -o tsv)
+
+ACR_SERVER=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.acrLoginServer.value'</span> -o tsv)
+
+APPINSIGHTS_CS=$(az deployment group show \
+  -g rg-agentic-rag -n main \
+  --query <span class="str">'properties.outputs.appInsightsConnectionString.value'</span> -o tsv)
+
+<span class="cmt"># Print all values — copy these for Phase 2</span>
+echo "OpenAI:          $OPENAI_ENDPOINT"
+echo "AI Search:       $SEARCH_ENDPOINT"
+echo "Doc Intelligence:$DOCINTEL_ENDPOINT"
+echo "SQL FQDN:        $SQL_FQDN"
+echo "Redis Host:      $REDIS_HOST"
+echo "ACR Server:      $ACR_SERVER"
+echo "App Insights:    $APPINSIGHTS_CS"
+</code></pre>
+
+        </div>
+    </div>
+
+    <!-- ── PHASE 2 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">2</div>
+            <div>
+                <div class="phase-title">Configure the .NET Application</div>
+                <div class="phase-sub">Wire endpoints from Bicep outputs into the app · ~5 minutes</div>
+            </div>
+        </div>
+        <div class="phase-body">
+
+            <div class="callout callout-warning">
+                <strong>🔑 Security first — use User Secrets for local development.</strong>
+                Never put real endpoints or passwords directly into <code>appsettings.json</code>
+                (which is committed to git). Use <code>dotnet user-secrets</code> instead — values are
+                stored outside the repo in your user profile and never committed.
+            </div>
+
+            <h4>Step 2.1 — Initialise User Secrets</h4>
+<pre><span class="lang">Bash</span>
+<code><span class="cmt"># Navigate to the project directory</span>
+cd src/AgenticRag
+
+<span class="cmt"># Initialise the user-secrets store for this project (once)</span>
+dotnet user-secrets init
+</code></pre>
+
+            <h4>Step 2.2 — Set Configuration Values (paste your Bicep output values)</h4>
+<pre><span class="lang">Bash — Run each line, replacing the placeholder values with your Bicep outputs</span>
+<code><span class="cmt"># Azure OpenAI</span>
+dotnet user-secrets set <span class="str">"AzureOpenAI:Endpoint"</span>            <span class="str">"$OPENAI_ENDPOINT"</span>
+dotnet user-secrets set <span class="str">"AzureOpenAI:ChatDeployment"</span>       <span class="str">"gpt-4o"</span>
+dotnet user-secrets set <span class="str">"AzureOpenAI:EmbeddingDeployment"</span>  <span class="str">"text-embedding-3-large"</span>
+
+<span class="cmt"># Azure AI Search</span>
+dotnet user-secrets set <span class="str">"AzureAISearch:Endpoint"</span>           <span class="str">"$SEARCH_ENDPOINT"</span>
+dotnet user-secrets set <span class="str">"AzureAISearch:IndexName"</span>          <span class="str">"rag-index"</span>
+
+<span class="cmt"># Azure Document Intelligence</span>
+dotnet user-secrets set <span class="str">"DocumentIntelligence:Endpoint"</span>    <span class="str">"$DOCINTEL_ENDPOINT"</span>
+
+<span class="cmt"># Azure SQL</span>
+dotnet user-secrets set <span class="str">"SqlServer:ConnectionString"</span>       <span class="str">"Server=$SQL_FQDN;Database=db-agenticrag;User Id=sqladmin;Password=StrongP@ssw0rd!123;Encrypt=True;"</span>
+
+<span class="cmt"># Azure Cache for Redis (get access key using the cluster name from Bicep outputs)</span>
+<span class="cmt"># The cluster name is the first DNS label of the Redis hostname captured in Step 1.4</span>
+REDIS_CLUSTER_NAME=$(echo $REDIS_HOST | cut -d. -f1)
+
+REDIS_KEY=$(az redisenterprise database list-keys \
+  --cluster-name $REDIS_CLUSTER_NAME \
+  --database-name default \
+  --resource-group rg-agentic-rag \
+  --query primaryKey -o tsv)
+
+dotnet user-secrets set <span class="str">"Redis:ConnectionString"</span>           <span class="str">"$REDIS_HOST:10000,password=$REDIS_KEY,ssl=True,abortConnect=False"</span>
+
+<span class="cmt"># Application Insights (optional but recommended)</span>
+dotnet user-secrets set <span class="str">"ApplicationInsights:ConnectionString"</span> <span class="str">"$APPINSIGHTS_CS"</span>
+</code></pre>
+
+            <h4>Step 2.3 — Verify configuration was set correctly</h4>
+<pre><span class="lang">Bash</span>
+<code><span class="cmt"># List all user secrets set for this project</span>
+dotnet user-secrets list
+</code></pre>
+
+        </div>
+    </div>
+
+    <!-- ── PHASE 3 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">3</div>
+            <div>
+                <div class="phase-title">Run the Application Locally</div>
+                <div class="phase-sub">dotnet restore → build → run · ~2 minutes</div>
+            </div>
+        </div>
+        <div class="phase-body">
+
+            <div class="callout callout-info">
+                <strong>🔐 Authentication:</strong>
+                The app uses <code>DefaultAzureCredential</code> (from <code>Azure.Identity</code>).
+                Because you ran <code>az login</code> in Phase 1, the credential chain automatically picks
+                up your Azure CLI token — no API keys needed in the application code.
+            </div>
+
+            <h4>Step 3.1 — Restore, Build, and Run</h4>
+<pre><span class="lang">Bash</span>
+<code><span class="cmt"># From the repository root</span>
+cd src/AgenticRag
+
+<span class="cmt"># Restore NuGet packages</span>
+dotnet restore
+
+<span class="cmt"># Build to verify there are no compile errors</span>
+dotnet build
+
+<span class="cmt"># Start the API (will bind to http://localhost:8088)</span>
+dotnet run
+</code></pre>
+
+            <h4>Step 3.2 — Verify the API is Running</h4>
+<pre><span class="lang">Bash — Open a new terminal tab while dotnet run is active</span>
+<code><span class="cmt"># Health check — confirms all Azure service connections are healthy</span>
+curl http://localhost:8088/health
+
+<span class="cmt"># Expected response:</span>
+<span class="cmt"># {"status":"healthy","timestamp":"2024-01-15T10:30:00Z"}</span>
+</code></pre>
+
+        </div>
+    </div>
+
+    <!-- ── PHASE 4 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">4</div>
+            <div>
+                <div class="phase-title">Ingestion Pipeline — Load Your Documents</div>
+                <div class="phase-sub">PDF / DOCX / Images → AI Search index · runs once per new document</div>
+            </div>
+        </div>
+        <div class="phase-body">
+
+            <p>
+                The ingestion pipeline transforms raw documents into searchable, vectorised chunks stored in Azure AI Search.
+                Under the hood it runs: <strong>Document Intelligence extraction</strong> → <strong>text chunking</strong>
+                (1,000 tokens, 200 overlap) → <strong>embedding generation</strong> (text-embedding-3-large, 3,072 dimensions)
+                → <strong>AI Search upload</strong>. You must ingest at least one document before the query pipeline will return meaningful answers.
+            </p>
+
+            <h4>Step 4.1 — Ingest your first PDF document</h4>
+<pre><span class="lang">Bash — Make sure dotnet run is still active in another terminal</span>
+<code><span class="cmt"># Ingest a PDF — triggers the full pipeline automatically</span>
+curl -X POST http://localhost:8088/api/ingest \
+  -F <span class="str">"file=@/path/to/your/finance-report.pdf"</span>
+
+<span class="cmt"># Successful response example:</span>
+<span class="cmt"># {</span>
+<span class="cmt">#   "fileName": "finance-report.pdf",</span>
+<span class="cmt">#   "chunksCreated": 42,</span>
+<span class="cmt">#   "charactersProcessed": 38500,</span>
+<span class="cmt">#   "message": "Successfully ingested 42 chunks from 'finance-report.pdf' into Azure AI Search."</span>
+<span class="cmt"># }</span>
+</code></pre>
+
+            <h4>Step 4.2 — Ingest additional documents (optional)</h4>
+<pre><span class="lang">Bash</span>
+<code><span class="cmt"># Word document</span>
+curl -X POST http://localhost:8088/api/ingest \
+  -F <span class="str">"file=@/path/to/technical-specs.docx"</span>
+
+<span class="cmt"># Scanned invoice image (Document Intelligence extracts text via OCR)</span>
+curl -X POST http://localhost:8088/api/ingest \
+  -F <span class="str">"file=@/path/to/invoice-scan.pdf"</span>
+</code></pre>
+
+            <div class="callout callout-success">
+                <strong>✅ After ingestion:</strong>
+                Log in to the <a href="https://portal.azure.com" target="_blank">Azure Portal</a>,
+                navigate to your AI Search resource → <em>Indexes</em> → <em>rag-index</em> → <em>Documents</em>
+                to verify that your chunks have been uploaded with their vector embeddings.
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ── PHASE 5 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">5</div>
+            <div>
+                <div class="phase-title">Query Pipeline — Ask Questions</div>
+                <div class="phase-sub">POST /api/chat → Planner → Executor → Reflection → Answer</div>
+            </div>
+        </div>
+        <div class="phase-body">
+
+            <p>
+                Every POST to <code>/api/chat</code> triggers the full agentic pipeline:
+                the <strong>PlannerAgent</strong> decomposes the question into steps,
+                the <strong>ExecutorAgent</strong> calls the right tools (AI Search, SQL, Document Intelligence),
+                and the <strong>ReflectionAgent</strong> scores the gathered evidence before producing the final answer.
+                Semantically similar repeat questions are answered instantly from the Redis cache.
+            </p>
+
+            <h4>Step 5.1 — Ask a simple question (single-source retrieval)</h4>
+<pre><span class="lang">Bash</span>
+<code>curl -X POST http://localhost:8088/api/chat \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"question": "What were our Q3 sales figures?", "userId": "user-1"}'</span>
+
+<span class="cmt"># Example response:</span>
+<span class="cmt"># {</span>
+<span class="cmt">#   "answer": "Q3 revenue was $2.8 million (source: finance-report.pdf, page 4).",</span>
+<span class="cmt">#   "fromCache": false,</span>
+<span class="cmt">#   "planSteps": 1,</span>
+<span class="cmt">#   "reflectionAttempts": 1,</span>
+<span class="cmt">#   "confidenceScore": 0.94</span>
+<span class="cmt"># }</span>
+</code></pre>
+
+            <h4>Step 5.2 — Ask a complex multi-source question (triggers multi-step planning)</h4>
+<pre><span class="lang">Bash</span>
+<code>curl -X POST http://localhost:8088/api/chat \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"question": "Compare Q3 and Q4 revenue from our finance reports and cross-check with the SQL database for any discrepancies.", "userId": "user-1"}'</span>
+</code></pre>
+
+            <h4>Step 5.3 — Re-ask a semantically similar question (instant cache hit)</h4>
+<pre><span class="lang">Bash</span>
+<code>curl -X POST http://localhost:8088/api/chat \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"question": "What was our revenue comparison between third and fourth quarter?", "userId": "user-1"}'</span>
+
+<span class="cmt"># "fromCache": true  ← Redis semantic cache (cosine similarity ≥ 0.92) returned instantly</span>
+</code></pre>
+
+        </div>
+    </div>
+
+    <!-- ── PHASE 6 ─────────────────────────────────────── -->
+    <div class="phase-group">
+        <div class="phase-header">
+            <div class="phase-num">6</div>
+            <div>
+                <div class="phase-title">Zero to Production — GitHub Actions CI/CD Pipeline</div>
+                <div class="phase-sub">Automated build → container push → Azure Container Apps deploy on every push to main</div>
+            </div>
+        </div>
+        <div class="phase-body">
+
+            <p>
+                This phase wires up a GitHub Actions workflow that triggers on every push to the
+                <code>main</code> branch. The pipeline: builds and pushes a Docker image to Azure Container
+                Registry, then deploys the new image to Azure Container Apps — fully automated, zero downtime.
+            </p>
+
+            <h4>Step 6.1 — Create an Azure Service Principal for GitHub Actions</h4>
+<pre><span class="lang">Bash — Run once; save the JSON output as a GitHub secret</span>
+<code><span class="cmt"># Get your subscription ID</span>
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+<span class="cmt"># Create a service principal with Contributor access to the resource group</span>
+az ad sp create-for-rbac \
+  --name <span class="str">"sp-agentic-rag-github"</span> \
+  --role Contributor \
+  --scopes /subscriptions/$SUBSCRIPTION_ID/resourceGroups/rg-agentic-rag \
+  --sdk-auth
+
+<span class="cmt"># The command prints a JSON block like:</span>
+<span class="cmt"># {</span>
+<span class="cmt">#   "clientId":       "...",</span>
+<span class="cmt">#   "clientSecret":   "...",</span>
+<span class="cmt">#   "subscriptionId": "...",</span>
+<span class="cmt">#   "tenantId":       "..."</span>
+<span class="cmt"># }</span>
+<span class="cmt"># Copy the ENTIRE JSON block — you will paste it as a GitHub secret next.</span>
+</code></pre>
+
+            <h4>Step 6.2 — Add Secrets to GitHub Repository</h4>
+            <div class="prereq-steps">
+                <div class="prereq-step">
+                    <div class="snum">A</div>
+                    <div class="scontent">
+                        <h4>Open GitHub Secrets</h4>
+                        <p>Go to your forked repository on GitHub → <strong>Settings</strong> → <strong>Secrets and variables</strong> → <strong>Actions</strong> → click <strong>New repository secret</strong>.</p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">B</div>
+                    <div class="scontent">
+                        <h4>Add <code>AZURE_CREDENTIALS</code></h4>
+                        <p>Name: <code>AZURE_CREDENTIALS</code> — Value: paste the entire JSON block from Step 6.1.</p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">C</div>
+                    <div class="scontent">
+                        <h4>Add <code>AZURE_RG</code></h4>
+                        <p>Name: <code>AZURE_RG</code> — Value: <code>rg-agentic-rag</code></p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">D</div>
+                    <div class="scontent">
+                        <h4>Add <code>ACR_LOGIN_SERVER</code></h4>
+                        <p>Name: <code>ACR_LOGIN_SERVER</code> — Value: your ACR login server, e.g. <code>acragenticrag&lt;suffix&gt;.azurecr.io</code> (from Step 1.4 output).</p>
+                    </div>
+                </div>
+                <div class="prereq-step">
+                    <div class="snum">E</div>
+                    <div class="scontent">
+                        <h4>Add <code>AZURE_OPENAI_ENDPOINT</code>, <code>AZURE_SEARCH_ENDPOINT</code>, <code>AZURE_DOCINTEL_ENDPOINT</code></h4>
+                        <p>Add the three Azure service endpoints as individual secrets (from Step 1.4). The pipeline injects them as Container App environment variables — no secrets are baked into the image.</p>
+                    </div>
+                </div>
+            </div>
+
+            <h4>Step 6.3 — Create the GitHub Actions Workflow File</h4>
+            <p>Create the file <code>.github/workflows/deploy.yml</code> in the repository with the following content:</p>
+<pre><span class="lang">YAML — .github/workflows/deploy.yml</span>
+<code><span class="cmt"># Agentic RAG — CI/CD Pipeline</span>
+<span class="cmt"># Triggers on every push to main:</span>
+<span class="cmt">#   1. Build .NET app and Docker image</span>
+<span class="cmt">#   2. Push image to Azure Container Registry</span>
+<span class="cmt">#   3. Deploy new image to Azure Container Apps</span>
+
+name: Deploy Agentic RAG to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   <span class="cmt"># allow manual trigger from GitHub UI</span>
+
+env:
+  IMAGE_NAME: agentic-rag
+  CONTAINER_APP_NAME: agentic-rag-api
+  CONTAINER_APP_ENV: cae-agentic-rag
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build, Push &amp; Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout source code ─────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Sign in to Azure ─────────────────────────
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ── 3. Build &amp; push Docker image to ACR ────────
+      - name: Build and push image to ACR
+        run: |
+          az acr build \
+            --registry ${{ secrets.ACR_LOGIN_SERVER }} \
+            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --image ${{ env.IMAGE_NAME }}:latest \
+            --file src/AgenticRag/Dockerfile \
+            src/AgenticRag
+
+      # ── 4. Create Container Apps environment (idempotent) ──
+      - name: Ensure Container Apps environment exists
+        run: |
+          az containerapp env show \
+            --name ${{ env.CONTAINER_APP_ENV }} \
+            --resource-group ${{ secrets.AZURE_RG }} \
+          || az containerapp env create \
+            --name ${{ env.CONTAINER_APP_ENV }} \
+            --resource-group ${{ secrets.AZURE_RG }} \
+            --location eastus
+
+      # ── 5. Deploy / update Container App ───────────
+      - name: Deploy to Azure Container Apps
+        run: |
+          # Check if the container app already exists
+          if az containerapp show \
+               --name ${{ env.CONTAINER_APP_NAME }} \
+               --resource-group ${{ secrets.AZURE_RG }} &gt; /dev/null 2&gt;&amp;1; then
+
+            # Update existing app with new image
+            az containerapp update \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.AZURE_RG }} \
+              --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          else
+            # Create app on first run
+            az containerapp create \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group ${{ secrets.AZURE_RG }} \
+              --environment ${{ env.CONTAINER_APP_ENV }} \
+              --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+              --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
+              --target-port 8088 \
+              --ingress external \
+              --min-replicas 1 \
+              --max-replicas 5 \
+              --env-vars \
+                AzureOpenAI__Endpoint="${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
+                AzureOpenAI__ChatDeployment=gpt-4o \
+                AzureOpenAI__EmbeddingDeployment=text-embedding-3-large \
+                AzureAISearch__Endpoint="${{ secrets.AZURE_SEARCH_ENDPOINT }}" \
+                AzureAISearch__IndexName=rag-index \
+                DocumentIntelligence__Endpoint="${{ secrets.AZURE_DOCINTEL_ENDPOINT }}"
+          fi
+
+      # ── 6. Print the production URL ──────────────────
+      - name: Get production URL
+        run: |
+          APP_URL=$(az containerapp show \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RG }} \
+            --query 'properties.configuration.ingress.fqdn' -o tsv)
+          echo "✅ Production API live at: https://$APP_URL"
+          echo "APP_URL=https://$APP_URL" &gt;&gt; $GITHUB_ENV
+</code></pre>
+
+            <h4>Step 6.4 — Commit the Workflow and Trigger the Pipeline</h4>
+<pre><span class="lang">Bash</span>
+<code><span class="cmt"># Create the workflows directory</span>
+mkdir -p .github/workflows
+
+<span class="cmt"># (paste the YAML from Step 6.3 into .github/workflows/deploy.yml)</span>
+
+<span class="cmt"># Commit and push — this triggers the pipeline immediately</span>
+git add .github/workflows/deploy.yml
+git commit -m <span class="str">"ci: add GitHub Actions deploy pipeline"</span>
+git push origin main
+</code></pre>
+
+            <div class="callout callout-success">
+                <strong>✅ What happens next:</strong>
+                Navigate to your GitHub repository → <strong>Actions</strong> tab to watch the pipeline run in real time.
+                The workflow will build the Docker image, push it to ACR, and deploy it to Azure Container Apps.
+                The final step prints the public HTTPS URL where your production API is live.
+            </div>
+
+            <h4>End-to-End Summary — Zero to Production Checklist</h4>
+            <table>
+                <thead>
+                    <tr><th>Phase</th><th>What you do</th><th>Result</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>0 — Prerequisites</strong></td><td>Install .NET 8, Azure CLI, Git, Docker · get Azure sub · clone repo</td><td>Machine ready</td></tr>
+                    <tr><td><strong>1 — Create Azure Resources</strong></td><td><code>az deployment group create … infra/main.bicep</code></td><td>All 9 Azure services provisioned with RBAC</td></tr>
+                    <tr><td><strong>2 — Configure .NET App</strong></td><td><code>dotnet user-secrets set …</code> (7 endpoints from Bicep outputs)</td><td>App knows where all Azure services are</td></tr>
+                    <tr><td><strong>3 — Run Locally</strong></td><td><code>dotnet restore &amp;&amp; dotnet build &amp;&amp; dotnet run</code></td><td>API live at <code>http://localhost:8088</code></td></tr>
+                    <tr><td><strong>4 — Ingestion Pipeline</strong></td><td><code>POST /api/ingest -F file=@report.pdf</code></td><td>Documents extracted → chunked → embedded → indexed in AI Search</td></tr>
+                    <tr><td><strong>5 — Query Pipeline</strong></td><td><code>POST /api/chat {"question":"…"}</code></td><td>Agentic multi-step answer with source citations</td></tr>
+                    <tr><td><strong>6 — 0 to Production</strong></td><td>Add 5 GitHub secrets · create <code>.github/workflows/deploy.yml</code> · push to main</td><td>Production HTTPS API on Azure Container Apps, auto-deployed on every push</td></tr>
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
 </section>
 
 <!-- ═══════════════ 5. FOUR PILLARS ══════════════════ -->
