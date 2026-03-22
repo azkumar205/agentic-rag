@@ -1,3 +1,4 @@
+using Azure;
 using Azure.AI.DocumentIntelligence;
 using Azure.Identity;
 using System.Text;
@@ -25,8 +26,7 @@ public sealed class DocumentIntelligenceTool
         var operation = await _client.AnalyzeDocumentAsync(
             WaitUntil.Completed,
             "prebuilt-layout",
-            BinaryData.FromStream(stream),
-            contentType: "application/octet-stream");
+            BinaryData.FromStream(stream));
 
         var result = operation.Value;
         var sb = new StringBuilder();

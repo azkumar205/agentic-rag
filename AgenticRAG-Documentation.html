@@ -164,6 +164,7 @@
         <a href="#beginner-setup">4. Beginner Setup</a>
         <a href="#four-pillars">5. Four Pillars</a>
         <a href="#architecture">6. Architecture</a>
+        <a href="#rag-phases">6b. Classic → Agentic Phases</a>
         <a href="#azure-services">7. Azure Services</a>
         <a href="#project-structure">8. Project Structure</a>
         <a href="#nuget-config">9. NuGet &amp; Config</a>
@@ -177,7 +178,8 @@
         <a href="#hosting">17. Hosting &amp; API</a>
         <a href="#ingestion">18. Data Ingestion</a>
         <a href="#walkthrough">19. Walkthrough</a>
-        <a href="#deploy">20. Deployment</a>
+        <a href="#deploy">20. Execution Steps</a>
+        <a href="#deploy-details">20b. Deployment Details</a>
         <a href="#testing">21. Testing</a>
         <a href="#interview">22. Interview Ready</a>
         <a href="#security">23. Security</a>
@@ -512,47 +514,223 @@ dotnet user-secrets set <span class="str">"Redis:ConnectionString"</span> <span 
 
 <!-- ═══════════════ 6. ARCHITECTURE ══════════════════ -->
 <section id="architecture">
-    <h2>6. System Architecture</h2>
+    <h2>6. System Architecture — End-to-End Data Flow</h2>
+    <p>
+        The system has <strong>two distinct pipelines</strong>: an <em>ingestion pipeline</em> (run once or when
+        new documents are added) that populates the knowledge base, and a <em>query pipeline</em> (every request)
+        that uses that knowledge base to answer questions. Both must work for the system to function.
+    </p>
+
+    <h3>Pipeline 1 — Ingestion (One-Time / On New Documents)</h3>
     <div class="flow">
 <pre>
-   ┌────────────────────────────────────────────────────────────────────┐
-   │          AGENTIC RAG — .NET 8 + Azure AI Foundry                  │
-   │                                                                    │
-   │   POST /api/chat  { "question": "...", "userId": "..." }          │
-   │        │                                                           │
-   │        ▼                                                           │
-   │   ┌──────────────────────┐                                         │
-   │   │   SEMANTIC CACHE     │── Hit (cosine ≥ 0.92) ──► Return Cached │
-   │   │   (Redis + HNSW)     │                                         │
-   │   └──────────┬───────────┘                                         │
-   │              │ Miss                                                │
-   │              ▼                                                     │
-   │   ┌──────────────────────────────────────────────────────┐         │
-   │   │              RAG WORKFLOW (RagWorkflow.cs)            │         │
-   │   │                                                      │         │
-   │   │  ┌──────────┐  ┌──────────────┐  ┌───────────────┐  │         │
-   │   │  │ PLANNER  │─►│  EXECUTOR    │─►│  REFLECTION   │  │         │
-   │   │  │ Agent    │  │  Agent       │  │  Agent        │  │         │
-   │   │  │          │  │              │  │               │  │         │
-   │   │  │ GPT-4o   │  │ • AI Search  │  │ • Confidence  │  │         │
-   │   │  │ decomposes│ │ • SQL Server │  │   score 0–1   │  │         │
-   │   │  │ query →  │  │ • Doc Intel  │  │ • Gap analysis│  │         │
-   │   │  │ plan[]   │  │ • Web Search │  │ • Re-plan if  │  │         │
-   │   │  └──────────┘  └──────────────┘  │   &lt; 0.8       │  │         │
-   │   │       ▲                          └───────┬───────┘  │         │
-   │   │       │                                  │ ≥ 0.8    │         │
-   │   │       └──────────Re-plan (max 2×)────────┘          │         │
-   │   └──────────────────────────────────────────────────────┘         │
-   │              │                                                     │
-   │              ▼                                                     │
-   │   ┌────────────────────────────────────────┐                       │
-   │   │  Cache answer in Redis + Return JSON   │                       │
-   │   └────────────────────────────────────────┘                       │
-   │                                                                    │
-   │   ASP.NET Core Minimal API — EXPOSE 8088 (Dockerfile)             │
-   └────────────────────────────────────────────────────────────────────┘
+   ┌──────────────────────────────────────────────────────────────────────────────┐
+   │  INGESTION PIPELINE  (POST /api/ingest  ←  src/AgenticRag/Services/          │
+   │                                             IngestionService.cs)             │
+   │                                                                              │
+   │   PDF / DOCX / Image Upload                                                  │
+   │        │                                                                     │
+   │        ▼                                                                     │
+   │   ┌──────────────────────────┐                                               │
+   │   │  DOCUMENT INTELLIGENCE   │  DocumentIntelligenceTool.ExtractAsync()      │
+   │   │  (prebuilt-layout model) │  → extracts text + tables from any format     │
+   │   └──────────┬───────────────┘                                               │
+   │              │ raw text                                                      │
+   │              ▼                                                               │
+   │   ┌──────────────────────────┐                                               │
+   │   │  CHUNKING                │  ChunkText(size=1000, overlap=200)            │
+   │   │                          │  → overlapping windows preserve context       │
+   │   └──────────┬───────────────┘                                               │
+   │              │ chunk[]                                                       │
+   │              ▼                                                               │
+   │   ┌──────────────────────────┐                                               │
+   │   │  EMBEDDING               │  EmbeddingClient.GenerateEmbeddingAsync()     │
+   │   │  text-embedding-3-large  │  → 3072-dimensional float vector per chunk    │
+   │   └──────────┬───────────────┘                                               │
+   │              │ {id, content, source, title, content_vector[3072]}            │
+   │              ▼                                                               │
+   │   ┌──────────────────────────┐                                               │
+   │   │  AZURE AI SEARCH         │  SearchClient.UploadDocumentsAsync()          │
+   │   │  (rag-index, HNSW)       │  → batches of 100, indexed for hybrid search  │
+   │   └──────────────────────────┘                                               │
+   │                                                                              │
+   │  Returns: { chunksCreated, charactersProcessed, fileName }                  │
+   └──────────────────────────────────────────────────────────────────────────────┘
 </pre>
     </div>
+
+    <h3>Pipeline 2 — Query (Every POST /api/chat Request)</h3>
+    <div class="flow">
+<pre>
+   ┌────────────────────────────────────────────────────────────────────────────┐
+   │  QUERY PIPELINE  (POST /api/chat  ←  src/AgenticRag/Workflow/              │
+   │                                      RagWorkflow.cs)                       │
+   │                                                                            │
+   │   POST /api/chat  { "question": "...", "userId": "..." }                  │
+   │        │                                                                   │
+   │        ▼                                                                   │
+   │   ┌──────────────────────┐                                                 │
+   │   │   SEMANTIC CACHE     │── Hit (cosine ≥ 0.92) ──► Return Cached        │
+   │   │   (Redis + HNSW)     │   SemanticCache.cs                             │
+   │   └──────────┬───────────┘                                                 │
+   │              │ Miss                                                        │
+   │              ▼                                                             │
+   │   ┌──────────────────────────────────────────────────────┐                 │
+   │   │              RAG WORKFLOW (RagWorkflow.cs)            │                 │
+   │   │                                                      │                 │
+   │   │  ┌──────────┐  ┌──────────────┐  ┌───────────────┐  │                 │
+   │   │  │ PLANNER  │─►│  EXECUTOR    │─►│  REFLECTION   │  │                 │
+   │   │  │ Agent    │  │  Agent       │  │  Agent        │  │                 │
+   │   │  │          │  │              │  │               │  │                 │
+   │   │  │ GPT-4o   │  │ • AI Search ◄├──┤ • Confidence  │  │                 │
+   │   │  │ decomposes│ │   (rag-index)│  │   score 0–1   │  │                 │
+   │   │  │ query →  │  │ • SQL Server │  │ • Gap analysis│  │                 │
+   │   │  │ plan[]   │  │ • Doc Intel  │  │ • Re-plan if  │  │                 │
+   │   │  └──────────┘  │ • Web Search │  │   &lt; 0.8       │  │                 │
+   │   │       ▲        └──────────────┘  └───────┬───────┘  │                 │
+   │   │       │                                  │ ≥ 0.8    │                 │
+   │   │       └──────────Re-plan (max 2×)────────┘          │                 │
+   │   └──────────────────────────────────────────────────────┘                 │
+   │              │                                                             │
+   │              ▼                                                             │
+   │   ┌────────────────────────────────────────┐                               │
+   │   │  Cache answer in Redis + Return JSON   │                               │
+   │   └────────────────────────────────────────┘                               │
+   │                                                                            │
+   │   ASP.NET Core Minimal API — EXPOSE 8088 (Dockerfile)                     │
+   └────────────────────────────────────────────────────────────────────────────┘
+</pre>
+    </div>
+
+    <div class="callout callout-warning">
+        <strong>⚠️ Important:</strong> The query pipeline's <code>search_knowledge_base</code> tool searches Azure AI Search
+        (rag-index). That index is <strong>only populated by the ingestion pipeline</strong>. If you skip ingestion,
+        the index is empty and all searches return nothing. Always run ingestion first.
+    </div>
+</section>
+
+<!-- ═══════════════ 6b. CLASSIC RAG TO AGENTIC RAG PHASES ══════════════════ -->
+<section id="rag-phases">
+    <h2>6b. From Classic RAG to Agentic RAG — Step by Step</h2>
+    <p>
+        The best way to understand Agentic RAG is to see how it grows from Classic RAG by adding
+        one capability at a time. Each phase below adds a new layer. The code for all phases already
+        exists in this project — phases are conceptual groupings, not separate branches.
+    </p>
+
+    <div class="timeline">
+        <div class="tl-step" data-step="1">
+            <h4>Phase 1 — Classic RAG (Baseline)</h4>
+            <p><strong>What you build:</strong> The ingestion pipeline + a simple search + LLM answer.</p>
+            <p><strong>Flow:</strong> Upload PDF → <code>IngestionService.IngestFileAsync()</code> → Azure AI Search index is populated.
+            Then query: <code>SearchClient.SearchAsync()</code> → top-K chunks → GPT-4o generates answer.</p>
+            <p><strong>Key files:</strong>
+                <code>Services/IngestionService.cs</code>,
+                <code>Tools/DocumentIntelligenceTool.cs</code>
+            </p>
+            <p><strong>Limitation:</strong> Single search call — if the question needs multiple steps (e.g., compare Q3 vs Q4),
+            classic RAG returns one search result and calls it done. No reasoning about what to look for.</p>
+        </div>
+
+        <div class="tl-step" data-step="2">
+            <h4>Phase 2 — Add Planning (PlannerAgent)</h4>
+            <p><strong>What changes:</strong> Instead of a single search, GPT-4o first <em>decomposes</em> the question into
+            a list of steps (<code>ExecutionPlan</code>) — each step specifies a tool and what to search for.</p>
+            <p><strong>Flow:</strong> Question → <code>PlannerAgent.CreatePlanAsync()</code> → plan with steps[]
+            → executor runs each step.</p>
+            <p><strong>Key files:</strong>
+                <code>Agents/PlannerAgent.cs</code>,
+                <code>Models/ChatModels.cs</code> (ExecutionPlan, PlanStep)
+            </p>
+            <p><strong>Benefit:</strong> Multi-hop queries work. "Compare Q3 and Q4 revenue" becomes two search steps,
+            not one.</p>
+        </div>
+
+        <div class="tl-step" data-step="3">
+            <h4>Phase 3 — Add Multi-Tool Execution (ExecutorAgent)</h4>
+            <p><strong>What changes:</strong> The Executor can dispatch to <em>four different tools</em> based on the plan step:
+            <code>search_knowledge_base</code>, <code>query_sql</code>, <code>extract_document</code>, <code>web_search</code>.</p>
+            <p><strong>Flow:</strong> Each plan step → tool dispatch → evidence gathered → GPT-4o synthesizes.</p>
+            <p><strong>Key files:</strong>
+                <code>Agents/ExecutorAgent.cs</code>,
+                <code>Tools/DocumentIntelligenceTool.cs</code>,
+                <code>Tools/SqlServerTool.cs</code>
+            </p>
+            <p><strong>Benefit:</strong> The system can join knowledge from PDFs (AI Search), databases (SQL), raw files
+            (Document Intelligence), and live web search in a single response.</p>
+        </div>
+
+        <div class="tl-step" data-step="4">
+            <h4>Phase 4 — Add Reflection &amp; Re-Planning (ReflectionAgent)</h4>
+            <p><strong>What changes:</strong> After execution, a <code>ReflectionAgent</code> evaluates the evidence with a
+            confidence score (0–1). If confidence &lt; 0.8, it identifies gaps and triggers a re-plan (up to 2 retries).</p>
+            <p><strong>Flow:</strong> Evidence + question → <code>ReflectionAgent.EvaluateAsync()</code> →
+            {confidence, gaps, needsMoreResearch} → re-plan if needed.</p>
+            <p><strong>Key files:</strong>
+                <code>Agents/ReflectionAgent.cs</code>,
+                <code>Workflow/RagWorkflow.cs</code>
+            </p>
+            <p><strong>Benefit:</strong> The system knows when it <em>doesn't know</em> and tries to fill gaps,
+            rather than hallucinating a confident answer.</p>
+        </div>
+
+        <div class="tl-step" data-step="5">
+            <h4>Phase 5 — Add Semantic Caching &amp; Memory (SemanticCache)</h4>
+            <p><strong>What changes:</strong> A Redis Enterprise HNSW cache stores (question embedding, answer) pairs.
+            Semantically similar questions (cosine ≥ 0.92) return the cached answer instantly without running the full pipeline.</p>
+            <p><strong>Flow:</strong> Question → embed → cosine search in Redis → cache hit → return immediately.</p>
+            <p><strong>Key files:</strong>
+                <code>Cache/SemanticCache.cs</code>,
+                <code>Workflow/RagWorkflow.cs</code>
+            </p>
+            <p><strong>Benefit:</strong> Cost and latency drop dramatically for repeat or similar questions.
+            The system also stores per-user conversation context (long-term memory).</p>
+        </div>
+    </div>
+
+    <h3>Phase Comparison Table</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Phase</th>
+                <th>Key Addition</th>
+                <th>Handles</th>
+                <th>Key File(s)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1 — Classic RAG</td>
+                <td>Ingestion pipeline + single search</td>
+                <td>Simple factual questions from indexed docs</td>
+                <td><code>IngestionService.cs</code></td>
+            </tr>
+            <tr>
+                <td>2 — Planning</td>
+                <td>Query decomposition into steps</td>
+                <td>Multi-hop, comparative questions</td>
+                <td><code>PlannerAgent.cs</code></td>
+            </tr>
+            <tr>
+                <td>3 — Multi-Tool</td>
+                <td>4 tools: Search, SQL, DocIntel, Web</td>
+                <td>Cross-source queries (PDF + DB + Live)</td>
+                <td><code>ExecutorAgent.cs</code></td>
+            </tr>
+            <tr>
+                <td>4 — Reflection</td>
+                <td>Confidence scoring + re-planning</td>
+                <td>Ambiguous or incomplete evidence</td>
+                <td><code>ReflectionAgent.cs</code></td>
+            </tr>
+            <tr>
+                <td>5 — Caching</td>
+                <td>Semantic cache + user memory</td>
+                <td>Repeat queries, low-latency, cost reduction</td>
+                <td><code>SemanticCache.cs</code></td>
+            </tr>
+        </tbody>
+    </table>
 </section>
 
 <!-- ═══════════════ 7. AZURE SERVICES ══════════════════ -->
@@ -599,6 +777,9 @@ dotnet user-secrets set <span class="str">"Redis:ConnectionString"</span> <span 
 │   ├── <span class="folder">Workflow/</span>
 │   │   └── <span class="hl">RagWorkflow.cs</span>                ← Orchestrates: Cache→Plan→Execute→Reflect
 │   │
+│   ├── <span class="folder">Services/</span>
+│   │   └── <span class="hl">IngestionService.cs</span>           ← Full ingestion pipeline: Extract→Chunk→Embed→Index
+│   │
 │   ├── <span class="folder">Tools/</span>
 │   │   ├── <span class="hl">DocumentIntelligenceTool.cs</span>   ← PDF/Image extraction (prebuilt-layout)
 │   │   └── <span class="hl">SqlServerTool.cs</span>              ← Read-only SQL (SELECT only, 100 row limit)
@@ -621,9 +802,11 @@ dotnet user-secrets set <span class="str">"Redis:ConnectionString"</span> <span 
     </div>
 
     <div class="callout callout-info">
-        <strong>Beginner Tip:</strong> Start by reading files in this order:
-        <code>ChatModels.cs</code> → <code>PlannerAgent.cs</code> → <code>ReflectionAgent.cs</code> →
-        <code>RagWorkflow.cs</code> → <code>Program.cs</code>. That's the entire data flow from top to bottom.
+        <strong>Beginner Tip — Read files in this order:</strong>
+        <code>ChatModels.cs</code> → <code>IngestionService.cs</code> (how data gets in) →
+        <code>PlannerAgent.cs</code> → <code>ExecutorAgent.cs</code> → <code>ReflectionAgent.cs</code> →
+        <code>RagWorkflow.cs</code> → <code>Program.cs</code>. Start with ingestion to understand
+        how documents flow into the system before understanding how queries flow out.
     </div>
 </section>
 
@@ -649,6 +832,8 @@ dotnet user-secrets set <span class="str">"Redis:ConnectionString"</span> <span 
     <span class="kw">&lt;PackageReference</span> Include=<span class="str">"Azure.AI.OpenAI"</span>                Version=<span class="str">"2.1.0"</span> <span class="kw">/&gt;</span>
     <span class="cmt">&lt;!-- Document Intelligence — PDF/image OCR + table extraction --&gt;</span>
     <span class="kw">&lt;PackageReference</span> Include=<span class="str">"Azure.AI.DocumentIntelligence"</span>  Version=<span class="str">"1.0.0"</span> <span class="kw">/&gt;</span>
+    <span class="cmt">&lt;!-- Azure AI Search — vector + semantic search + index management --&gt;</span>
+    <span class="kw">&lt;PackageReference</span> Include=<span class="str">"Azure.Search.Documents"</span>         Version=<span class="str">"11.7.0"</span> <span class="kw">/&gt;</span>
     <span class="cmt">&lt;!-- Managed Identity / DefaultAzureCredential --&gt;</span>
     <span class="kw">&lt;PackageReference</span> Include=<span class="str">"Azure.Identity"</span>                 Version=<span class="str">"1.13.2"</span> <span class="kw">/&gt;</span>
     <span class="cmt">&lt;!-- SQL Server access (read-only SELECT queries) --&gt;</span>
@@ -1594,97 +1779,167 @@ curl -X POST http://localhost:8088/api/ingest \
     <h2>18. Data Ingestion — Loading Documents into Azure AI Search</h2>
     <p>
         Before the agent can search your internal documents, you need to ingest them into Azure AI Search.
-        The ingestion pipeline: <strong>Extract text</strong> (Document Intelligence) →
+        The full ingestion pipeline is implemented in
+        <strong><code>src/AgenticRag/Services/IngestionService.cs</code></strong>:
+        <strong>Extract text</strong> (Document Intelligence) →
         <strong>Chunk</strong> → <strong>Embed</strong> (text-embedding-3-large) →
         <strong>Upload to AI Search</strong> index.
     </p>
+    <p>
+        The <code>POST /api/ingest</code> endpoint in <code>Program.cs</code> exposes this pipeline over HTTP.
+        Upload any PDF, DOCX, or image — the endpoint creates the index if needed, chunks and embeds the
+        document, and uploads everything to Azure AI Search. It returns the number of chunks created.
+    </p>
 
-    <h3>Ingestion Steps</h3>
+    <h3>Ingestion Steps (all implemented in IngestionService.cs)</h3>
     <div class="timeline">
         <div class="tl-step" data-step="1">
-            <h4>Create the Azure AI Search Index</h4>
-            <p>Define fields: <code>id</code> (key), <code>content</code> (searchable), <code>source</code> (filterable),
-            <code>title</code> (text), <code>content_vector</code> (3072-dim vector with HNSW profile).</p>
+            <h4>EnsureIndexExistsAsync() — Create the Azure AI Search Index</h4>
+            <p>Defines fields: <code>id</code> (key), <code>content</code> (searchable), <code>source</code> (filterable),
+            <code>title</code> (text), <code>content_vector</code> (3072-dim vector with HNSW profile + semantic config).
+            Uses <code>SearchIndexClient.CreateOrUpdateIndexAsync()</code> — safe to call on every startup (idempotent).</p>
         </div>
         <div class="tl-step" data-step="2">
-            <h4>Extract Text from Documents</h4>
-            <p>Use <code>DocumentIntelligenceTool.ExtractAsync(filePath)</code> — works for PDF, DOCX, JPEG, PNG, TIFF.
-            Returns plain text including table content.</p>
+            <h4>IngestFileAsync() — Step 1: Extract Text</h4>
+            <p>Calls <code>DocumentIntelligenceTool.ExtractAsync(filePath)</code> — works for PDF, DOCX, JPEG, PNG, TIFF.
+            Returns plain text including table content extracted from every page.</p>
         </div>
         <div class="tl-step" data-step="3">
-            <h4>Chunk the Text</h4>
-            <p>Split into overlapping chunks (1000 chars, 200 overlap). Overlap ensures sentences
-            at chunk boundaries are not split across different search results.</p>
+            <h4>IngestFileAsync() — Step 2: Chunk the Text</h4>
+            <p>Calls <code>ChunkText(text, size=1000, overlap=200)</code>. Overlap ensures sentences
+            at chunk boundaries are not lost when searching. Each chunk is independently searchable.</p>
         </div>
         <div class="tl-step" data-step="4">
-            <h4>Embed Each Chunk</h4>
-            <p>Call <code>EmbeddingClient.GenerateEmbeddingAsync(chunk)</code> → 3072-float vector.
-            Each chunk gets its own vector for semantic search.</p>
+            <h4>IngestFileAsync() — Step 3: Embed Each Chunk</h4>
+            <p>Calls <code>EmbeddingClient.GenerateEmbeddingAsync(chunk)</code> → 3072-float vector (text-embedding-3-large).
+            Each chunk gets its own vector for semantic similarity search.</p>
         </div>
         <div class="tl-step" data-step="5">
-            <h4>Upload to Azure AI Search</h4>
-            <p>Use <code>SearchClient.UploadDocumentsAsync(batch)</code>. Upload in batches of 100 for efficiency.
-            Azure AI Search handles indexing automatically.</p>
+            <h4>IngestFileAsync() — Step 4: Upload to Azure AI Search</h4>
+            <p>Calls <code>SearchClient.UploadDocumentsAsync(batch)</code> in batches of 100.
+            Azure AI Search indexes all fields automatically (BM25 for keyword, HNSW for vector, semantic for hybrid).</p>
         </div>
     </div>
 
-<pre><span class="lang">C# — Ingestion (conceptual, extend as needed)</span>
+<pre><span class="lang">C# — src/AgenticRag/Services/IngestionService.cs (full implementation)</span>
 <code><span class="kw">using</span> <span class="cls">Azure</span>.<span class="cls">AI</span>.<span class="cls">OpenAI</span>;
 <span class="kw">using</span> <span class="cls">Azure</span>.<span class="cls">Identity</span>;
 <span class="kw">using</span> <span class="cls">Azure</span>.<span class="cls">Search</span>.<span class="cls">Documents</span>;
 <span class="kw">using</span> <span class="cls">Azure</span>.<span class="cls">Search</span>.<span class="cls">Documents</span>.<span class="cls">Indexes</span>;
+<span class="kw">using</span> <span class="cls">Azure</span>.<span class="cls">Search</span>.<span class="cls">Documents</span>.<span class="cls">Indexes</span>.<span class="cls">Models</span>;
+<span class="kw">using</span> <span class="cls">Azure</span>.<span class="cls">Search</span>.<span class="cls">Documents</span>.<span class="cls">Models</span>;
+<span class="kw">using</span> <span class="cls">OpenAI</span>.<span class="cls">Embeddings</span>;
 <span class="kw">using</span> <span class="cls">AgenticRag</span>.Tools;
 
-<span class="cmt">// Helper: chunk text with overlap to preserve context at boundaries</span>
-<span class="kw">static</span> <span class="cls">IEnumerable</span>&lt;<span class="kw">string</span>&gt; <span class="fn">ChunkText</span>(<span class="kw">string</span> text, <span class="kw">int</span> size = <span class="num">1000</span>, <span class="kw">int</span> overlap = <span class="num">200</span>)
+<span class="kw">namespace</span> <span class="cls">AgenticRag</span>.Services;
+
+<span class="kw">public sealed class</span> <span class="cls">IngestionService</span>
 {
-    <span class="kw">for</span> (<span class="kw">int</span> start = <span class="num">0</span>; start &lt; text.Length; start += size - overlap)
-        <span class="kw">yield return</span> text[start..<span class="cls">Math</span>.<span class="fn">Min</span>(start + size, text.Length)];
-}
+    <span class="kw">private readonly</span> <span class="cls">DocumentIntelligenceTool</span> _docTool;
+    <span class="kw">private readonly</span> <span class="cls">EmbeddingClient</span> _embeddingClient;
+    <span class="kw">private readonly</span> <span class="cls">SearchClient</span> _searchClient;
+    <span class="kw">private readonly</span> <span class="cls">SearchIndexClient</span> _indexClient;
+    <span class="kw">private readonly string</span> _indexName;
+    <span class="kw">private readonly int</span> _embeddingDimensions;
 
-<span class="kw">async</span> <span class="cls">Task</span> <span class="fn">IngestFileAsync</span>(<span class="kw">string</span> filePath, <span class="cls">IConfiguration</span> config)
-{
-    <span class="kw">var</span> credential = <span class="kw">new</span> <span class="cls">DefaultAzureCredential</span>();
+    <span class="cmt">// ... constructor omitted for brevity — see full file in src/AgenticRag/Services/IngestionService.cs</span>
 
-    <span class="cmt">// Step 1: Extract text from the document</span>
-    <span class="kw">var</span> docTool = <span class="kw">new</span> <span class="cls">DocumentIntelligenceTool</span>(config[<span class="str">"DocumentIntelligence:Endpoint"</span>]!, credential);
-    <span class="kw">var</span> text = <span class="kw">await</span> docTool.<span class="fn">ExtractAsync</span>(filePath);
-
-    <span class="cmt">// Step 2: Chunk + embed</span>
-    <span class="kw">var</span> oai = <span class="kw">new</span> <span class="cls">AzureOpenAIClient</span>(<span class="kw">new</span> <span class="cls">Uri</span>(config[<span class="str">"AzureOpenAI:Endpoint"</span>]!), credential);
-    <span class="kw">var</span> embedClient = oai.<span class="fn">GetEmbeddingClient</span>(config[<span class="str">"AzureOpenAI:EmbeddingDeployment"</span>]!);
-
-    <span class="kw">var</span> docs = <span class="kw">new</span> <span class="cls">List</span>&lt;<span class="cls">SearchDocument</span>&gt;();
-    <span class="kw">foreach</span> (<span class="kw">var</span> (chunk, i) <span class="kw">in</span> <span class="fn">ChunkText</span>(text).<span class="fn">Select</span>((c, i) =&gt; (c, i)))
+    <span class="cmt">/// Ensures AI Search index exists with correct schema (idempotent)</span>
+    <span class="kw">public async</span> <span class="cls">Task</span> <span class="fn">EnsureIndexExistsAsync</span>()
     {
-        <span class="kw">var</span> embedding = <span class="kw">await</span> embedClient.<span class="fn">GenerateEmbeddingAsync</span>(chunk);
-        docs.<span class="fn">Add</span>(<span class="kw">new</span> <span class="cls">SearchDocument</span>
+        <span class="kw">var</span> fields = <span class="kw">new</span> <span class="cls">List</span>&lt;<span class="cls">SearchField</span>&gt;
         {
-            [<span class="str">"id"</span>] = <span class="cls">Guid</span>.<span class="fn">NewGuid</span>().<span class="fn">ToString</span>(<span class="str">"N"</span>),
-            [<span class="str">"content"</span>] = chunk,
-            [<span class="str">"source"</span>] = filePath,
-            [<span class="str">"title"</span>] = <span class="str">$"{Path.GetFileName(filePath)} - chunk {i + 1}"</span>,
-            [<span class="str">"content_vector"</span>] = embedding.Value.<span class="fn">ToFloats</span>().<span class="fn">ToArray</span>()
-        });
+            <span class="kw">new</span> <span class="cls">SimpleField</span>(<span class="str">"id"</span>, <span class="cls">SearchFieldDataType</span>.String) { IsKey = <span class="kw">true</span> },
+            <span class="kw">new</span> <span class="cls">SearchableField</span>(<span class="str">"content"</span>),
+            <span class="kw">new</span> <span class="cls">SimpleField</span>(<span class="str">"source"</span>, <span class="cls">SearchFieldDataType</span>.String) { IsFilterable = <span class="kw">true</span> },
+            <span class="kw">new</span> <span class="cls">SearchableField</span>(<span class="str">"title"</span>),
+            <span class="kw">new</span> <span class="cls">VectorSearchField</span>(<span class="str">"content_vector"</span>, _embeddingDimensions, <span class="str">"hnsw-config"</span>)
+        };
+        <span class="cmt">// ... HNSW algorithm + semantic config setup (see IngestionService.cs)</span>
+        <span class="kw">await</span> _indexClient.<span class="fn">CreateOrUpdateIndexAsync</span>(<span class="kw">new</span> <span class="cls">SearchIndex</span>(_indexName) { Fields = fields, <span class="cmt">/* ... */</span> });
     }
 
-    <span class="cmt">// Step 3: Upload in batches of 100</span>
-    <span class="kw">var</span> searchClient = <span class="kw">new</span> <span class="cls">SearchClient</span>(
-        <span class="kw">new</span> <span class="cls">Uri</span>(config[<span class="str">"AzureAISearch:Endpoint"</span>]!),
-        config[<span class="str">"AzureAISearch:IndexName"</span>]!, credential);
+    <span class="cmt">/// Full ingestion: Extract → Chunk → Embed → Upload (returns chunk count + chars)</span>
+    <span class="kw">public async</span> <span class="cls">Task</span>&lt;<span class="cls">IngestionResult</span>&gt; <span class="fn">IngestFileAsync</span>(<span class="kw">string</span> filePath, <span class="kw">int</span> chunkSize = <span class="num">1000</span>, <span class="kw">int</span> overlap = <span class="num">200</span>)
+    {
+        <span class="cmt">// Step 1: Extract text via Document Intelligence</span>
+        <span class="kw">var</span> text = <span class="kw">await</span> _docTool.<span class="fn">ExtractAsync</span>(filePath);
 
-    <span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; docs.Count; i += <span class="num">100</span>)
-        <span class="kw">await</span> searchClient.<span class="fn">UploadDocumentsAsync</span>(docs.<span class="fn">GetRange</span>(i, <span class="cls">Math</span>.<span class="fn">Min</span>(<span class="num">100</span>, docs.Count - i)));
+        <span class="cmt">// Step 2: Chunk with overlap</span>
+        <span class="kw">var</span> chunks = <span class="fn">ChunkText</span>(text, chunkSize, overlap).<span class="fn">ToList</span>();
 
-    <span class="cls">Console</span>.<span class="fn">WriteLine</span>(<span class="str">$"Ingested {docs.Count} chunks from {filePath}"</span>);
+        <span class="cmt">// Step 3: Embed + build SearchDocument list</span>
+        <span class="kw">var</span> docs = <span class="kw">new</span> <span class="cls">List</span>&lt;<span class="cls">SearchDocument</span>&gt;(chunks.Count);
+        <span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; chunks.Count; i++)
+        {
+            <span class="kw">var</span> embedding = <span class="kw">await</span> _embeddingClient.<span class="fn">GenerateEmbeddingAsync</span>(chunks[i]);
+            docs.<span class="fn">Add</span>(<span class="kw">new</span> <span class="cls">SearchDocument</span>
+            {
+                [<span class="str">"id"</span>] = <span class="cls">Guid</span>.<span class="fn">NewGuid</span>().<span class="fn">ToString</span>(<span class="str">"N"</span>),
+                [<span class="str">"content"</span>] = chunks[i],
+                [<span class="str">"source"</span>] = filePath,
+                [<span class="str">"title"</span>] = <span class="str">$"{Path.GetFileName(filePath)} - chunk {i + 1}"</span>,
+                [<span class="str">"content_vector"</span>] = embedding.Value.<span class="fn">ToFloats</span>().<span class="fn">ToArray</span>()
+            });
+        }
+
+        <span class="cmt">// Step 4: Upload in batches of 100</span>
+        <span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; docs.Count; i += <span class="num">100</span>)
+            <span class="kw">await</span> _searchClient.<span class="fn">UploadDocumentsAsync</span>(docs.<span class="fn">GetRange</span>(i, <span class="cls">Math</span>.<span class="fn">Min</span>(<span class="num">100</span>, docs.Count - i)));
+
+        <span class="kw">return new</span> <span class="cls">IngestionResult</span>(<span class="cls">Path</span>.<span class="fn">GetFileName</span>(filePath), docs.Count, text.Length);
+    }
+
+    <span class="kw">private static</span> <span class="cls">IEnumerable</span>&lt;<span class="kw">string</span>&gt; <span class="fn">ChunkText</span>(<span class="kw">string</span> text, <span class="kw">int</span> size, <span class="kw">int</span> overlap)
+    {
+        <span class="kw">for</span> (<span class="kw">int</span> start = <span class="num">0</span>; start &lt; text.Length; start += size - overlap)
+            <span class="kw">yield return</span> text[start..<span class="cls">Math</span>.<span class="fn">Min</span>(start + size, text.Length)];
+    }
 }
+
+<span class="kw">public record</span> <span class="cls">IngestionResult</span>(<span class="kw">string</span> FileName, <span class="kw">int</span> ChunksCreated, <span class="kw">int</span> CharactersProcessed);
+</code></pre>
+
+<pre><span class="lang">C# — src/AgenticRag/Program.cs (updated /api/ingest endpoint)</span>
+<code><span class="cmt">// Ingestion endpoint — full pipeline: Extract → Chunk → Embed → Index into Azure AI Search</span>
+app.<span class="fn">MapPost</span>(<span class="str">"/api/ingest"</span>, <span class="kw">async</span> (<span class="cls">HttpRequest</span> http, <span class="cls">IngestionService</span> ingestionService) =&gt;
+{
+    <span class="kw">var</span> form = <span class="kw">await</span> http.<span class="fn">ReadFormAsync</span>();
+    <span class="kw">var</span> file = form.Files.<span class="fn">FirstOrDefault</span>();
+    <span class="kw">if</span> (file <span class="kw">is null</span>)
+        <span class="kw">return</span> <span class="cls">Results</span>.<span class="fn">BadRequest</span>(<span class="kw">new</span> { error = <span class="str">"No file provided."</span> });
+
+    <span class="kw">var</span> tempPath = <span class="cls">Path</span>.<span class="fn">Combine</span>(<span class="cls">Path</span>.<span class="fn">GetTempPath</span>(), file.FileName);
+    <span class="kw">await using</span> (<span class="kw">var</span> stream = <span class="cls">File</span>.<span class="fn">Create</span>(tempPath))
+        <span class="kw">await</span> file.<span class="fn">CopyToAsync</span>(stream);
+
+    <span class="kw">try</span>
+    {
+        <span class="kw">await</span> ingestionService.<span class="fn">EnsureIndexExistsAsync</span>();        <span class="cmt">// idempotent</span>
+        <span class="kw">var</span> result = <span class="kw">await</span> ingestionService.<span class="fn">IngestFileAsync</span>(tempPath);
+        <span class="kw">return</span> <span class="cls">Results</span>.<span class="fn">Ok</span>(<span class="kw">new</span> {
+            fileName = result.FileName,
+            chunksCreated = result.ChunksCreated,
+            charactersProcessed = result.CharactersProcessed,
+            message = <span class="str">$"Ingested {result.ChunksCreated} chunks from '{result.FileName}' into Azure AI Search."</span>
+        });
+    }
+    <span class="kw">finally</span> { <span class="cls">File</span>.<span class="fn">Delete</span>(tempPath); }
+});
 </code></pre>
 
     <div class="callout callout-info">
-        <strong>Tip — Use the /api/ingest endpoint for quick testing:</strong>
-        <code>POST /api/ingest</code> with a multipart file upload will extract text and return a preview.
-        For a full production ingestion pipeline, add the indexing logic above and schedule it
-        with Azure Functions or a background service.
+        <strong>✅ This is fully implemented code</strong> — not conceptual. The complete
+        <code>IngestionService.cs</code> is in <code>src/AgenticRag/Services/IngestionService.cs</code>
+        and is registered in DI in <code>Program.cs</code>. The <code>POST /api/ingest</code> endpoint
+        now runs the full Extract → Chunk → Embed → Index pipeline and returns meaningful results.
+    </div>
+
+    <div class="callout callout-info">
+        <strong>Note on Document Intelligence extraction:</strong> Document Intelligence is called
+        <em>only during ingestion</em>, not at query time. Queries use <code>search_knowledge_base</code>
+        which searches the <em>pre-indexed</em> chunks in Azure AI Search. This means ingestion happens once
+        per document; subsequent queries against that document are fast vector searches, not re-extraction.
     </div>
 </section>
 
@@ -1750,9 +2005,198 @@ curl -X POST http://localhost:8088/api/ingest \
 
 <!-- ═══════════════ 20. DEPLOYMENT ══════════════════ -->
 <section id="deploy">
-    <h2>20. Deployment — Local → Docker → Azure Production</h2>
+    <h2>20. Deployment — Complete Execution Steps (Top to Bottom)</h2>
 
-    <h3>20.1 Run Locally (Development)</h3>
+    <div class="callout callout-info">
+        <strong>These steps take you from zero to a running Agentic RAG system.</strong>
+        Follow them in order: deploy infrastructure → configure credentials → ingest documents → query the system.
+    </div>
+
+    <h3>Step 1 — Prerequisites</h3>
+<pre><span class="lang">Bash — One-time tools setup</span>
+<code><span class="cmt"># Install required tools (if not already installed)</span>
+dotnet --version          <span class="cmt"># Must be .NET 8+</span>
+az --version              <span class="cmt"># Azure CLI</span>
+docker --version          <span class="cmt"># Docker Desktop (for containerization)</span>
+
+<span class="cmt"># Log in to Azure</span>
+az login
+az account set --subscription "&lt;your-subscription-id&gt;"
+
+<span class="cmt"># Create a resource group</span>
+az group create --name rg-agentic-rag --location eastus
+</code></pre>
+
+    <h3>Step 2 — Deploy Azure Infrastructure (Bicep)</h3>
+<pre><span class="lang">Bash — Deploy ALL resources with one command</span>
+<code><span class="cmt"># Get your user/principal object ID for RBAC role assignments</span>
+PRINCIPAL_ID=$(az ad signed-in-user show --query id -o tsv)
+
+<span class="cmt"># Deploy all Azure resources (OpenAI, AI Search, Document Intelligence,</span>
+<span class="cmt"># Redis Enterprise, SQL Server, Container Registry, App Insights)</span>
+az deployment group create \
+  --resource-group rg-agentic-rag \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam \
+  --parameters \
+    sqlAdminUser=sqladmin \
+    sqlAdminPassword='StrongPassword!123' \
+    appPrincipalId=$PRINCIPAL_ID \
+    appPrincipalType=User
+
+<span class="cmt"># Wait for deployment to complete (5-10 minutes)</span>
+<span class="cmt"># Get output values for appsettings.json</span>
+az deployment group show \
+  --resource-group rg-agentic-rag \
+  --name main \
+  --query properties.outputs
+</code></pre>
+
+    <h3>Step 3 — Configure appsettings.json</h3>
+<pre><span class="lang">Bash — Populate config from Bicep deployment outputs</span>
+<code><span class="cmt"># Get resource endpoints from Bicep outputs</span>
+OPENAI_ENDPOINT=$(az deployment group show -g rg-agentic-rag -n main --query 'properties.outputs.openaiEndpoint.value' -o tsv)
+SEARCH_ENDPOINT=$(az deployment group show -g rg-agentic-rag -n main --query 'properties.outputs.searchEndpoint.value' -o tsv)
+DOCINTEL_ENDPOINT=$(az deployment group show -g rg-agentic-rag -n main --query 'properties.outputs.docIntelEndpoint.value' -o tsv)
+SQL_FQDN=$(az deployment group show -g rg-agentic-rag -n main --query 'properties.outputs.sqlServerFqdn.value' -o tsv)
+REDIS_HOST=$(az deployment group show -g rg-agentic-rag -n main --query 'properties.outputs.redisHostName.value' -o tsv)
+
+<span class="cmt"># Update src/AgenticRag/appsettings.json with these values</span>
+<span class="cmt"># (or use dotnet user-secrets for local development)</span>
+dotnet user-secrets --project src/AgenticRag set "AzureOpenAI:Endpoint" "$OPENAI_ENDPOINT"
+dotnet user-secrets --project src/AgenticRag set "AzureAISearch:Endpoint" "$SEARCH_ENDPOINT"
+dotnet user-secrets --project src/AgenticRag set "DocumentIntelligence:Endpoint" "$DOCINTEL_ENDPOINT"
+</code></pre>
+
+    <h3>Step 4 — Build and Test Locally</h3>
+<pre><span class="lang">Bash — Local development run</span>
+<code><span class="cmt"># Restore and build the project</span>
+cd src/AgenticRag
+dotnet restore
+dotnet build
+
+<span class="cmt"># Run locally (DefaultAzureCredential uses your 'az login' credentials)</span>
+dotnet run
+
+<span class="cmt"># Verify the API is running</span>
+curl http://localhost:8088/health
+<span class="cmt"># Expected: {"status":"healthy","timestamp":"..."}</span>
+</code></pre>
+
+    <h3>Step 5 — Ingest Documents (Classic RAG Foundation)</h3>
+<pre><span class="lang">Bash — Upload and index your first PDF document</span>
+<code><span class="cmt"># Upload a PDF — this runs the full ingestion pipeline:</span>
+<span class="cmt"># Document Intelligence → Chunk → Embed → Upload to AI Search</span>
+curl -X POST http://localhost:8088/api/ingest \
+  -F "file=@/path/to/your/finance-report.pdf"
+
+<span class="cmt"># Expected response:</span>
+<span class="cmt"># {</span>
+<span class="cmt">#   "fileName": "finance-report.pdf",</span>
+<span class="cmt">#   "chunksCreated": 42,</span>
+<span class="cmt">#   "charactersProcessed": 38500,</span>
+<span class="cmt">#   "message": "Successfully ingested 42 chunks from 'finance-report.pdf' into Azure AI Search."</span>
+<span class="cmt"># }</span>
+
+<span class="cmt"># Ingest more documents as needed</span>
+curl -X POST http://localhost:8088/api/ingest -F "file=@/path/to/technical-specs.docx"
+curl -X POST http://localhost:8088/api/ingest -F "file=@/path/to/invoice-scan.pdf"
+</code></pre>
+
+    <h3>Step 6 — Query the System (Agentic RAG)</h3>
+<pre><span class="lang">Bash — Test the full agentic query pipeline</span>
+<code><span class="cmt"># Simple question — uses Classic RAG (search_knowledge_base)</span>
+curl -X POST http://localhost:8088/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What were our Q3 sales figures?", "userId": "user-1"}'
+
+<span class="cmt"># Complex multi-source question — triggers multi-step planning</span>
+curl -X POST http://localhost:8088/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Compare Q3 and Q4 revenue from our finance reports and check SQL for discrepancies.", "userId": "user-1"}'
+
+<span class="cmt"># Same (or semantically similar) question again — instant cache hit!</span>
+curl -X POST http://localhost:8088/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What was our revenue comparison between third and fourth quarter?", "userId": "user-1"}'
+
+<span class="cmt"># Expected response structure:</span>
+<span class="cmt"># {</span>
+<span class="cmt">#   "answer": "Q3 revenue was $2.8M (source: finance-report.pdf). Q4 was $3.1M...",</span>
+<span class="cmt">#   "fromCache": false,</span>
+<span class="cmt">#   "planSteps": 3,</span>
+<span class="cmt">#   "reflectionAttempts": 1,</span>
+<span class="cmt">#   "confidenceScore": 0.91</span>
+<span class="cmt"># }</span>
+</code></pre>
+
+    <h3>Step 7 — Deploy to Azure Production</h3>
+<pre><span class="lang">Bash — Container build and Azure Container Apps deployment</span>
+<code><span class="cmt"># Get ACR login server from Bicep outputs</span>
+ACR_LOGIN_SERVER=$(az deployment group show -g rg-agentic-rag -n main --query 'properties.outputs.acrLoginServer.value' -o tsv)
+
+<span class="cmt"># Build and push to Azure Container Registry</span>
+az acr build \
+  --registry ${ACR_LOGIN_SERVER%%.*} \
+  --image agentic-rag:latest \
+  --file src/AgenticRag/Dockerfile \
+  src/AgenticRag
+
+<span class="cmt"># Create Container Apps environment and deploy</span>
+az containerapp env create \
+  --name cae-agentic-rag \
+  --resource-group rg-agentic-rag \
+  --location eastus
+
+az containerapp create \
+  --name agentic-rag-api \
+  --resource-group rg-agentic-rag \
+  --environment cae-agentic-rag \
+  --image $ACR_LOGIN_SERVER/agentic-rag:latest \
+  --target-port 8088 \
+  --ingress external \
+  --min-replicas 1 --max-replicas 5 \
+  --env-vars \
+    AzureOpenAI__Endpoint="$OPENAI_ENDPOINT" \
+    AzureOpenAI__ChatDeployment=gpt-4o \
+    AzureOpenAI__EmbeddingDeployment=text-embedding-3-large \
+    AzureAISearch__Endpoint="$SEARCH_ENDPOINT" \
+    AzureAISearch__IndexName=rag-index \
+    DocumentIntelligence__Endpoint="$DOCINTEL_ENDPOINT"
+
+<span class="cmt"># Get the public URL</span>
+APP_URL=$(az containerapp show -n agentic-rag-api -g rg-agentic-rag --query 'properties.configuration.ingress.fqdn' -o tsv)
+echo "API available at: https://$APP_URL"
+</code></pre>
+
+    <div class="callout callout-success">
+        <strong>Production Security:</strong> Enable a system-assigned managed identity on your Container App,
+        then grant it RBAC roles using the Bicep <code>appPrincipalId</code> parameter.
+        Required roles: <em>Cognitive Services OpenAI User</em>, <em>Search Index Data Contributor</em>,
+        <em>Cognitive Services User</em> (for Document Intelligence).
+        The app uses <code>DefaultAzureCredential</code> which automatically picks up the managed identity — no secrets needed.
+    </div>
+
+    <h3>Complete Execution Summary</h3>
+    <table>
+        <thead><tr><th>Step</th><th>Command / Action</th><th>Purpose</th><th>Phase</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td><code>az login</code> + resource group create</td><td>Authenticate and prepare Azure</td><td>Setup</td></tr>
+            <tr><td>2</td><td><code>az deployment group create ... infra/main.bicep</code></td><td>Create all 9 Azure resources + RBAC roles</td><td>Infrastructure</td></tr>
+            <tr><td>3</td><td><code>dotnet user-secrets set ...</code></td><td>Configure local endpoints from Bicep outputs</td><td>Configuration</td></tr>
+            <tr><td>4</td><td><code>dotnet run</code></td><td>Start the API locally</td><td>Local Dev</td></tr>
+            <tr><td>5</td><td><code>POST /api/ingest -F file=@report.pdf</code></td><td>Extract → Chunk → Embed → Index documents</td><td>Classic RAG ✅</td></tr>
+            <tr><td>6</td><td><code>POST /api/chat</code></td><td>Run agentic queries against indexed docs</td><td>Agentic RAG ✅</td></tr>
+            <tr><td>7</td><td><code>az acr build</code> + <code>az containerapp create</code></td><td>Deploy containerized API to Azure</td><td>Production</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════ OLD 20. DEPLOYMENT (Docker + ACR details) ══════════════════ -->
+<section id="deploy-details">
+    <h2>20b. Deployment Details — Local → Docker → Azure</h2>
+
+    <h3>Local Development Run</h3>
 <pre><span class="lang">Bash</span>
 <code><span class="cmt"># 1. Restore NuGet packages</span>
 cd src/AgenticRag

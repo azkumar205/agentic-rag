@@ -1,4 +1,5 @@
 using AgenticRag.Cache;
+using AgenticRag.Services;
 using AgenticRag.Tools;
 using AgenticRag.Agents;
 using AgenticRag.Workflow;
@@ -56,6 +57,16 @@ builder.Services.AddSingleton<ReflectionAgent>(sp =>
 
 builder.Services.AddSingleton<RagWorkflow>();
 
+builder.Services.AddSingleton<IngestionService>(sp =>
+    new IngestionService(
+        builder.Configuration["AzureAISearch:Endpoint"]!,
+        builder.Configuration["AzureAISearch:IndexName"]!,
+        builder.Configuration["AzureOpenAI:Endpoint"]!,
+        builder.Configuration["AzureOpenAI:EmbeddingDeployment"]!,
+        int.Parse(builder.Configuration["AzureOpenAI:EmbeddingDimensions"] ?? "3072"),
+        sp.GetRequiredService<DefaultAzureCredential>(),
+        sp.GetRequiredService<DocumentIntelligenceTool>()));
+
 var app = builder.Build();
 
 // ─── API Endpoints ─────────────────────────────────
@@ -73,10 +84,9 @@ app.MapPost("/api/chat", async (ChatRequest request, RagWorkflow workflow) =>
     return Results.Ok(response);
 });
 
-// Ingestion endpoint
-app.MapPost("/api/ingest", async (HttpRequest http, DocumentIntelligenceTool docTool) =>
+// Ingestion endpoint — full pipeline: Extract → Chunk → Embed → Index into Azure AI Search
+app.MapPost("/api/ingest", async (HttpRequest http, IngestionService ingestionService) =>
 {
-    // Accepts a file upload, extracts text, returns chunks ready for indexing
     var form = await http.ReadFormAsync();
     var file = form.Files.FirstOrDefault();
     if (file is null)
@@ -88,10 +98,24 @@ app.MapPost("/api/ingest", async (HttpRequest http, DocumentIntelligenceTool doc
         await file.CopyToAsync(stream);
     }
 
-    var text = await docTool.ExtractAsync(tempPath);
-    File.Delete(tempPath);
+    try
+    {
+        // Ensure the AI Search index exists with the correct schema before ingesting
+        await ingestionService.EnsureIndexExistsAsync();
 
-    return Results.Ok(new { fileName = file.FileName, characterCount = text.Length, preview = text[..Math.Min(500, text.Length)] });
+        var result = await ingestionService.IngestFileAsync(tempPath);
+        return Results.Ok(new
+        {
+            fileName = result.FileName,
+            chunksCreated = result.ChunksCreated,
+            charactersProcessed = result.CharactersProcessed,
+            message = $"Successfully ingested {result.ChunksCreated} chunks from '{result.FileName}' into Azure AI Search."
+        });
+    }
+    finally
+    {
+        File.Delete(tempPath);
+    }
 });
 
 app.Run();
