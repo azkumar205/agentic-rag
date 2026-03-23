@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgenticRag.Agent/AgenticRag.Agent.csproj" />
+    <Project Path="src/AgenticRag.Api/AgenticRag.Api.csproj" />
+    <Project Path="src/AgenticRag.DataAccess/AgenticRag.DataAccess.csproj" />
+    <Project Path="src/AgenticRag.Shared/AgenticRag.Shared.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multimodal Agentic RAG — Azure &amp; .NET Documentation</title>
+<style>
+  :root {
+    --primary: #0078d4;
+    --secondary: #005a9e;
+    --accent: #50e6ff;
+    --bg: #f9fafb;
+    --surface: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --code-bg: #1e293b;
+    --code-text: #e2e8f0;
+    --border: #e5e7eb;
+    --success: #059669;
+    --warning: #d97706;
+    --danger: #dc2626;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    padding: 2.5rem 2rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; font-weight: 700; }
+  header p { margin-top: 0.5rem; opacity: 0.9; font-size: 1.05rem; }
+
+  nav {
+    background: var(--secondary);
+    padding: 0.75rem 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  nav a {
+    color: var(--accent);
+    text-decoration: none;
+    padding: 0.3rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+  nav a:hover { background: rgba(255,255,255,0.15); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+  section { margin-bottom: 3rem; }
+
+  h2 {
+    font-size: 1.7rem;
+    color: var(--primary);
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 0.4rem;
+    margin-bottom: 1.2rem;
+    margin-top: 2rem;
+  }
+  h3 {
+    font-size: 1.25rem;
+    color: var(--secondary);
+    margin-bottom: 0.75rem;
+    margin-top: 1.5rem;
+  }
+  h4 { font-size: 1.05rem; color: var(--text); margin: 1rem 0 0.5rem; font-weight: 600; }
+
+  p { margin-bottom: 0.9rem; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-right: 0.3rem;
+  }
+  .badge-beginner { background: #d1fae5; color: #065f46; }
+  .badge-intermediate { background: #fef3c7; color: #92400e; }
+  .badge-advanced { background: #fee2e2; color: #991b1b; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .flow-diagram {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.5rem;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .flow-step {
+    background: var(--primary);
+    color: white;
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+  .flow-arrow { color: var(--muted); font-size: 1.2rem; }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 1.2rem 1.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.87rem;
+    margin: 1rem 0;
+    line-height: 1.6;
+  }
+  code { font-family: 'Cascadia Code', 'Consolas', monospace; }
+
+  .qa-block { border-left: 4px solid var(--primary); padding-left: 1rem; margin-bottom: 1.5rem; }
+  .qa-q { font-weight: 700; color: var(--primary); margin-bottom: 0.3rem; }
+  .qa-a { color: var(--text); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin: 1rem 0;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 0.7rem 1rem;
+    text-align: left;
+  }
+  td { padding: 0.65rem 1rem; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: #f0f7ff; }
+
+  .highlight { background: #fff3cd; border-left: 4px solid var(--warning); padding: 0.75rem 1rem; border-radius: 4px; margin: 1rem 0; }
+  .info { background: #e0f2fe; border-left: 4px solid var(--primary); padding: 0.75rem 1rem; border-radius: 4px; margin: 1rem 0; }
+
+  ul, ol { padding-left: 1.5rem; margin-bottom: 0.9rem; }
+  li { margin-bottom: 0.3rem; }
+
+  .tag { background: #e0edff; color: var(--secondary); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.82rem; margin: 0.1rem; display: inline-block; }
+
+  footer { background: var(--secondary); color: rgba(255,255,255,0.8); text-align: center; padding: 1.5rem; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Multimodal Agentic RAG</h1>
+  <p>Azure + .NET — Classic RAG &amp; Agentic RAG with Microsoft Agent Framework</p>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#beginner">Beginner Concepts</a>
+  <a href="#intermediate">Intermediate</a>
+  <a href="#advanced">Advanced</a>
+  <a href="#classic-rag">Classic RAG Flow</a>
+  <a href="#agentic-rag">Agentic RAG Flow</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#infrastructure">Infrastructure</a>
+  <a href="#running">How to Run</a>
+  <a href="#interview">Interview Prep</a>
+</nav>
+
+<div class="container">
+
+<!-- =================== OVERVIEW =================== -->
+<section id="overview">
+  <h2>Project Overview</h2>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Phase 1 — Classic RAG</h3>
+      <p>Weekly incremental ingestion of PDFs, Word docs, images, and scanned documents from Azure Blob Storage. Multimodal extraction, chunking, embeddings, and hybrid search. Downloadable citations.</p>
+      <div><span class="tag">.NET 9</span><span class="tag">Azure AI Search</span><span class="tag">Azure OpenAI</span><span class="tag">Document Intelligence</span></div>
+    </div>
+    <div class="card">
+      <h3>Phase 2 — Agentic RAG</h3>
+      <p>Multi-step reasoning agent with tool calling (document search, SQL queries, web search). Caching, memorization, and persistent chat threads with context carry-over.</p>
+      <div><span class="tag">Agent Framework</span><span class="tag">Tool Calling</span><span class="tag">GPT-4o</span><span class="tag">SQL Server</span><span class="tag">Bing Search</span></div>
+    </div>
+    <div class="card">
+      <h3>Solution Structure</h3>
+      <ul>
+        <li><code>AgenticRag.Api</code> — ASP.NET Core Web API</li>
+        <li><code>AgenticRag.Agent</code> — Agentic orchestration</li>
+        <li><code>AgenticRag.DataAccess</code> — Azure services</li>
+        <li><code>AgenticRag.Shared</code> — Shared models</li>
+        <li><code>infra/</code> — Bicep templates</li>
+        <li><code>docs/</code> — HTML documentation</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- =================== BEGINNER =================== -->
+<section id="beginner">
+  <h2><span class="badge badge-beginner">BEGINNER</span> Core Concepts</h2>
+
+  <h3>What is RAG?</h3>
+  <p><strong>Retrieval-Augmented Generation (RAG)</strong> is a pattern that combines a retrieval system with a generative AI model. Instead of relying solely on the LLM's training data, RAG first <em>retrieves</em> relevant documents from your knowledge base, then passes them to the LLM as grounding context to generate an accurate, cited answer.</p>
+
+  <div class="flow-diagram">
+    <span class="flow-step">User Query</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Embed Query</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Vector Search</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Retrieve Chunks</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Prompt LLM</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Grounded Answer</span>
+  </div>
+
+  <h3>What are Embeddings?</h3>
+  <p>Embeddings are numerical vectors (arrays of floats) that represent the <em>semantic meaning</em> of text. Two semantically similar texts will have vectors that are close together in high-dimensional space, even if they use different words. This enables semantic search.</p>
+  <div class="card">
+    <h4>Example in this project:</h4>
+    <pre><code>// Generate embedding for a user query
+float[] queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(
+    "What are the Q3 revenue figures?");
+// Embedding model: text-embedding-ada-002 (1536 dimensions)</code></pre>
+  </div>
+
+  <h3>What is Multimodal RAG?</h3>
+  <p>Multimodal RAG handles more than just plain text. This project supports:</p>
+  <table>
+    <tr><th>Content Type</th><th>Source</th><th>Extraction Method</th></tr>
+    <tr><td>Text</td><td>PDFs, .docx, .txt</td><td>Azure Document Intelligence</td></tr>
+    <tr><td>Tables</td><td>PDFs, Word</td><td>Document Intelligence table extraction</td></tr>
+    <tr><td>Images</td><td>PNG, JPG, TIFF</td><td>Document Intelligence OCR</td></tr>
+    <tr><td>Scanned Docs</td><td>Scanned PDFs</td><td>OCR via prebuilt-layout model</td></tr>
+  </table>
+
+  <h3>What is a Citation?</h3>
+  <p>A citation tracks <em>where</em> a piece of retrieved information came from. It includes the file name, page number, section, and a text snippet. Users can download citation bundles as JSON for audit and traceability.</p>
+</section>
+
+<!-- =================== INTERMEDIATE =================== -->
+<section id="intermediate">
+  <h2><span class="badge badge-intermediate">INTERMEDIATE</span> Chunking, Hybrid Search &amp; Incremental Ingestion</h2>
+
+  <h3>Document Chunking Strategy</h3>
+  <p>Large documents cannot fit into LLM context windows or embedding models. We split them into smaller <em>chunks</em> with a sliding window overlap to preserve context at chunk boundaries.</p>
+  <div class="card">
+    <h4>Chunking parameters (DocumentExtractionService.cs):</h4>
+    <ul>
+      <li><strong>Chunk size:</strong> 500 words</li>
+      <li><strong>Overlap:</strong> 50 words (ensures boundary context is not lost)</li>
+      <li>Tables are extracted as standalone chunks (preserve structure)</li>
+    </ul>
+  </div>
+
+  <h3>Hybrid Search</h3>
+  <p>Hybrid search combines <strong>keyword (BM25)</strong> and <strong>vector semantic</strong> search, then merges results using <strong>Reciprocal Rank Fusion (RRF)</strong>. This combines the precision of keyword matching with the semantic understanding of vector search.</p>
+
+  <table>
+    <tr><th>Search Type</th><th>Mechanism</th><th>Best For</th></tr>
+    <tr><td>Semantic</td><td>Pure vector similarity (cosine)</td><td>Conceptual / meaning-based queries</td></tr>
+    <tr><td>Keyword</td><td>BM25 full-text search</td><td>Exact terms, product names, codes</td></tr>
+    <tr><td><strong>Hybrid</strong></td><td>Vector + BM25 fused with RRF</td><td>Most queries — best overall recall</td></tr>
+  </table>
+
+  <h3>Weekly Incremental Ingestion</h3>
+  <p>The system does <em>incremental</em> ingestion — only processing new or updated documents since the last run. This reduces cost and processing time vs. full reindexing.</p>
+  <div class="flow-diagram">
+    <span class="flow-step">Get last run timestamp</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">List new blobs (since timestamp)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Download &amp; Extract</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Chunk &amp; Embed</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Index to Azure AI Search</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Update timestamp</span>
+  </div>
+  <p>The API endpoint <code>POST /api/ingestion/run</code> accepts an optional <code>since</code> timestamp. In production, an Azure Function timer trigger would call this weekly.</p>
+</section>
+
+<!-- =================== ADVANCED =================== -->
+<section id="advanced">
+  <h2><span class="badge badge-advanced">ADVANCED</span> Agentic RAG, Tool Orchestration &amp; Memory</h2>
+
+  <h3>What is Agentic RAG?</h3>
+  <p>In <strong>classic RAG</strong>, the system follows a fixed pipeline: embed → retrieve → generate. In <strong>agentic RAG</strong>, the LLM acts as a <em>reasoning agent</em> that decides which tools to invoke, in what order, and how to combine results — all dynamically, based on the query intent.</p>
+
+  <table>
+    <tr><th>Aspect</th><th>Classic RAG</th><th>Agentic RAG</th></tr>
+    <tr><td>Pipeline</td><td>Fixed (embed → retrieve → generate)</td><td>Dynamic (LLM reasons and selects tools)</td></tr>
+    <tr><td>Data Sources</td><td>Single (vector index)</td><td>Multiple (docs, SQL, web)</td></tr>
+    <tr><td>Reasoning Steps</td><td>1</td><td>Up to N (configurable)</td></tr>
+    <tr><td>Tool Use</td><td>No</td><td>Yes (function calling)</td></tr>
+    <tr><td>Memory</td><td>No</td><td>Yes (preferences, facts)</td></tr>
+    <tr><td>Caching</td><td>Optional</td><td>Built-in (query + context)</td></tr>
+  </table>
+
+  <h3>Agent Tools</h3>
+  <div class="card-grid">
+    <div class="card">
+      <h4>🔍 DocumentSearchTool</h4>
+      <p>Performs hybrid search over indexed documents in Azure AI Search. Returns top-K chunks with file, page, section, and content.</p>
+    </div>
+    <div class="card">
+      <h4>🗄️ SqlQueryTool</h4>
+      <p>Executes read-only SELECT queries against Azure SQL Server. Only SELECT statements permitted (security guardrail). Returns row data as JSON.</p>
+    </div>
+    <div class="card">
+      <h4>🌐 WebSearchTool</h4>
+      <p>Queries the Bing Web Search API for current public information. Used when documents or SQL don't cover the query.</p>
+    </div>
+  </div>
+
+  <h3>Agent Reasoning Loop (ReAct Pattern)</h3>
+  <pre><code>for step in 1..MaxReasoningSteps:
+    response = LLM.complete(messages, tools=all_tools)
+
+    if response.finish_reason == STOP:
+        return final_answer + citations
+
+    if response.finish_reason == TOOL_CALLS:
+        for each tool_call in response.tool_calls:
+            output = tool.execute(tool_call.args)
+            messages.append(tool_result(output))
+            extract_citations(output)
+
+return "Max steps reached"</code></pre>
+
+  <h3>Caching Strategy</h3>
+  <p>The <code>CacheService</code> uses <code>IMemoryCache</code> to avoid re-running expensive LLM calls for identical or near-identical queries.</p>
+  <ul>
+    <li>Cache key: normalized query string (<code>rag:{query.toLower().trim()}</code>)</li>
+    <li>Default TTL: 60 minutes (configurable via <code>Agent:CacheExpirationMinutes</code>)</li>
+    <li>Cached <code>AgentResponse.FromCache = true</code> to indicate source</li>
+  </ul>
+
+  <h3>Memorization</h3>
+  <p>The <code>MemoryService</code> persists user preferences and important facts across sessions. This allows the system prompt to be personalized on subsequent requests.</p>
+  <pre><code>// Store a preference
+POST /api/memory/preferences
+{ "userId": "user1", "key": "preferredLanguage", "value": "English" }
+
+// Store an important fact
+POST /api/memory/facts
+{ "userId": "user1", "fact": "User works in the finance department" }
+
+// These are injected into the system prompt on every agent call</code></pre>
+
+  <h3>Chat Thread Design</h3>
+  <p>Each chat session has a unique thread ID. The agent maintains message history within the thread, enabling context carry-over across turns. Threads can be reset without losing the thread ID.</p>
+  <pre><code>// Create thread
+POST /api/chat/threads  →  { "id": "3f2a...", "title": "Thread 2025-..." }
+
+// Send message (uses thread history as context)
+POST /api/chat/threads/{threadId}/messages
+{ "content": "What was mentioned in the Q3 report?" }
+
+// Reset thread history (keep thread ID)
+POST /api/chat/threads/{threadId}/reset</code></pre>
+</section>
+
+<!-- =================== CLASSIC RAG FLOW =================== -->
+<section id="classic-rag">
+  <h2>Classic RAG Flow (Phase 1)</h2>
+
+  <h3>Ingestion Pipeline</h3>
+  <div class="flow-diagram">
+    <span class="flow-step">Azure Blob Storage</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">BlobStorageService<br/>(list new blobs)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">DocumentExtractionService<br/>(Azure Doc Intelligence)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Chunking<br/>(500 words, 50 overlap)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">EmbeddingService<br/>(text-embedding-ada-002)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">SearchService<br/>(index to Azure AI Search)</span>
+  </div>
+
+  <h3>Query Pipeline</h3>
+  <div class="flow-diagram">
+    <span class="flow-step">POST /api/rag/query</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Embed query</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Hybrid search<br/>(vector + BM25)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Return chunks<br/>+ citations</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Optional:<br/>download citations</span>
+  </div>
+
+  <h3>API Endpoints (Phase 1)</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td>POST</td><td>/api/rag/query</td><td>Semantic or hybrid search with citations</td></tr>
+    <tr><td>POST</td><td>/api/rag/citations/download</td><td>Download citation bundle as JSON</td></tr>
+    <tr><td>POST</td><td>/api/ingestion/run</td><td>Trigger incremental ingestion</td></tr>
+    <tr><td>GET</td><td>/api/ingestion/jobs/{jobId}</td><td>Check ingestion job status</td></tr>
+  </table>
+</section>
+
+<!-- =================== AGENTIC RAG FLOW =================== -->
+<section id="agentic-rag">
+  <h2>Agentic RAG Flow (Phase 2)</h2>
+
+  <div class="flow-diagram">
+    <span class="flow-step">POST /api/agent/query<br/>or<br/>/api/chat/threads/{id}/messages</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Check cache<br/>(CacheService)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Load thread history<br/>+ user memory</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">AgentOrchestrator<br/>ReAct loop</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Tool calls<br/>(docs/SQL/web)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Final grounded answer<br/>+ citations</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Persist to thread<br/>+ cache response</span>
+  </div>
+
+  <h3>API Endpoints (Phase 2)</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td>POST</td><td>/api/agent/query</td><td>One-shot agentic query</td></tr>
+    <tr><td>POST</td><td>/api/agent/citations/download</td><td>Download agent citation bundle</td></tr>
+    <tr><td>POST</td><td>/api/chat/threads</td><td>Create chat thread</td></tr>
+    <tr><td>GET</td><td>/api/chat/threads/{id}</td><td>Get thread with message history</td></tr>
+    <tr><td>GET</td><td>/api/chat/threads</td><td>List all threads</td></tr>
+    <tr><td>POST</td><td>/api/chat/threads/{id}/messages</td><td>Send message to thread</td></tr>
+    <tr><td>POST</td><td>/api/chat/threads/{id}/reset</td><td>Reset thread history</td></tr>
+    <tr><td>GET</td><td>/api/memory/{userId}</td><td>Get user memory</td></tr>
+    <tr><td>POST</td><td>/api/memory/facts</td><td>Add important fact</td></tr>
+    <tr><td>POST</td><td>/api/memory/preferences</td><td>Set user preference</td></tr>
+  </table>
+</section>
+
+<!-- =================== ARCHITECTURE =================== -->
+<section id="architecture">
+  <h2>Architecture Overview</h2>
+
+  <div class="card">
+    <h4>Solution Layout</h4>
+    <pre><code>AgenticRag.slnx
+src/
+├── AgenticRag.Shared/         # Shared models &amp; enums
+│   ├── Models/                # DocumentChunk, Citation, ChatThread, AgentResponse...
+│   └── Enums/                 # ContentType, SearchType, MessageRole, IngestionStatus
+├── AgenticRag.DataAccess/     # Azure service integrations
+│   ├── Interfaces/            # IBlobStorageService, ISearchService, IEmbeddingService...
+│   ├── Services/              # Concrete implementations
+│   └── Configuration/        # Options classes (AzureStorageOptions, etc.)
+├── AgenticRag.Agent/          # Agentic orchestration
+│   ├── Interfaces/            # IAgentTool, IAgentOrchestrator, IChatThreadService...
+│   ├── Services/              # AgentOrchestrator, CacheService, MemoryService, ChatThreadService
+│   ├── Tools/                 # DocumentSearchTool, SqlQueryTool, WebSearchTool
+│   └── Configuration/        # AgentOptions
+└── AgenticRag.Api/            # ASP.NET Core Web API
+    ├── Controllers/           # RagController, AgentController, ChatController...
+    └── Models/                # Request DTOs
+infra/
+├── main.bicep                 # Entry point Bicep template
+└── modules/                  # storage, search, openai, documentintelligence, sql, appservice
+docs/
+└── index.html                 # This documentation</code></pre>
+  </div>
+
+  <h3>Dependency Graph</h3>
+  <pre><code>AgenticRag.Api
+    └── AgenticRag.Agent
+    │   └── AgenticRag.DataAccess
+    │       └── AgenticRag.Shared
+    └── AgenticRag.DataAccess
+        └── AgenticRag.Shared</code></pre>
+
+  <h3>Security &amp; Non-Functional Concerns</h3>
+  <div class="card-grid">
+    <div class="card">
+      <h4>🔒 Security</h4>
+      <ul>
+        <li>SQL tool: SELECT-only (injection guardrail)</li>
+        <li>All secrets via environment variables / Azure Key Vault</li>
+        <li>HTTPS enforced on App Service</li>
+        <li>TLS 1.2 minimum on SQL and Storage</li>
+        <li>No public blob access</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>📈 Scalability</h4>
+      <ul>
+        <li>Stateless API — horizontal scale via App Service</li>
+        <li>Batch embedding generation reduces API calls</li>
+        <li>Azure AI Search partitions for indexing scale</li>
+        <li>In-memory cache reduces LLM calls</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>🛡️ Guardrails</h4>
+      <ul>
+        <li>Hallucination: LLM instructed to cite sources, avoid speculation</li>
+        <li>Prompt injection: System prompt not user-controllable</li>
+        <li>Data leakage: SQL read-only, no PII in citations</li>
+        <li>Reasoning step limit: prevents infinite loops</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- =================== INFRASTRUCTURE =================== -->
+<section id="infrastructure">
+  <h2>Azure Infrastructure (Bicep)</h2>
+
+  <h3>Resources Deployed</h3>
+  <table>
+    <tr><th>Resource</th><th>Purpose</th><th>SKU</th></tr>
+    <tr><td>Azure Storage Account</td><td>Document source (Blob)</td><td>Standard LRS</td></tr>
+    <tr><td>Azure AI Search</td><td>Vector + hybrid search index</td><td>Standard (semantic enabled)</td></tr>
+    <tr><td>Azure OpenAI</td><td>Embeddings + GPT-4o chat</td><td>S0 + 30K TPM deployments</td></tr>
+    <tr><td>Azure Document Intelligence</td><td>OCR, table, image extraction</td><td>S0</td></tr>
+    <tr><td>Azure SQL Server + DB</td><td>Structured data for SQL agent tool</td><td>Serverless Gen5</td></tr>
+    <tr><td>Azure App Service</td><td>Hosts AgenticRag.Api</td><td>P1v3 (Linux, .NET 9)</td></tr>
+  </table>
+
+  <h3>Deploy</h3>
+  <pre><code># Create resource group
+az group create --name rg-agentic-rag-dev --location eastus2
+
+# Deploy all resources (prompts for SQL password)
+az deployment group create \
+  --resource-group rg-agentic-rag-dev \
+  --template-file infra/main.bicep \
+  --parameters environmentName=dev sqlAdminPassword='YourSecureP@ssw0rd!'</code></pre>
+</section>
+
+<!-- =================== HOW TO RUN =================== -->
+<section id="running">
+  <h2>How to Run the System End-to-End</h2>
+
+  <h3>Prerequisites</h3>
+  <ul>
+    <li>.NET 9 SDK</li>
+    <li>Azure subscription with access to OpenAI, AI Search, Document Intelligence, SQL</li>
+    <li>Azure CLI (for Bicep deployment)</li>
+  </ul>
+
+  <h3>Step 1: Deploy Azure Infrastructure</h3>
+  <pre><code>az deployment group create \
+  --resource-group rg-agentic-rag-dev \
+  --template-file infra/main.bicep \
+  --parameters environmentName=dev sqlAdminPassword='SecurePass!'</code></pre>
+
+  <h3>Step 2: Configure appsettings.json</h3>
+  <p>Copy the deployment outputs and replace the placeholder values in <code>src/AgenticRag.Api/appsettings.json</code> (or use environment variables / user secrets for local dev).</p>
+  <pre><code>dotnet user-secrets set "AzureOpenAI:ApiKey" "your-key" \
+  --project src/AgenticRag.Api/AgenticRag.Api.csproj</code></pre>
+
+  <h3>Step 3: Upload Documents to Blob Storage</h3>
+  <pre><code>az storage blob upload-batch \
+  --account-name &lt;storage-account-name&gt; \
+  --destination documents \
+  --source ./my-documents/</code></pre>
+
+  <h3>Step 4: Run the API</h3>
+  <pre><code>cd src/AgenticRag.Api
+dotnet run</code></pre>
+
+  <h3>Step 5: Trigger Ingestion</h3>
+  <pre><code>curl -X POST http://localhost:5000/api/ingestion/run \
+  -H "Content-Type: application/json" \
+  -d '{"containerName": "documents"}'</code></pre>
+
+  <h3>Step 6: Query (Classic RAG)</h3>
+  <pre><code>curl -X POST http://localhost:5000/api/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What are the main risks in the annual report?", "searchType": "Hybrid"}'</code></pre>
+
+  <h3>Step 7: Agentic Chat (Phase 2)</h3>
+  <pre><code># Create a chat thread
+curl -X POST http://localhost:5000/api/chat/threads
+
+# Send a message (replace THREAD_ID)
+curl -X POST http://localhost:5000/api/chat/threads/THREAD_ID/messages \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Compare Q3 revenue from documents with latest web data"}'</code></pre>
+</section>
+
+<!-- =================== INTERVIEW PREP =================== -->
+<section id="interview">
+  <h2>Interview-Ready Content</h2>
+
+  <h3><span class="badge badge-beginner">BEGINNER</span> Questions</h3>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: What is the difference between classic RAG and agentic RAG?</p>
+    <p class="qa-a">A: Classic RAG follows a fixed pipeline (embed → retrieve → generate) with a single retrieval step and one data source. Agentic RAG uses an LLM as a reasoning agent that can dynamically select and chain multiple tools (document search, SQL, web search) over multiple reasoning steps to answer complex, multi-source queries.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: What is an embedding and why is it needed for RAG?</p>
+    <p class="qa-a">A: An embedding is a dense numerical vector that represents the semantic meaning of text. RAG needs embeddings to convert both documents and queries into the same vector space so that semantically similar content can be found via vector similarity (cosine distance), enabling queries to find relevant documents even when exact keyword matches don't exist.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: What is multimodal RAG?</p>
+    <p class="qa-a">A: Multimodal RAG processes different types of content beyond plain text — including images, tables, and scanned documents (via OCR). In this project, Azure Document Intelligence extracts text, tables, and OCR content from PDFs, Word docs, and images before chunking and indexing.</p>
+  </div>
+
+  <h3><span class="badge badge-intermediate">INTERMEDIATE</span> Questions</h3>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: What is hybrid search and why is it better than pure vector search?</p>
+    <p class="qa-a">A: Hybrid search combines vector semantic search with BM25 keyword search, fusing results via Reciprocal Rank Fusion. Pure vector search can miss exact matches for specific terms (codes, names, IDs). Pure keyword search misses semantically similar content. Hybrid gets the benefits of both: high recall and semantic understanding, especially important for heterogeneous enterprise document corpora.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: How does incremental ingestion work, and why does it matter at scale?</p>
+    <p class="qa-a">A: Incremental ingestion tracks a "last run" timestamp and only processes blobs modified after that point. This avoids reindexing the entire document corpus every week, reducing Azure OpenAI embedding costs, Document Intelligence API calls, and processing time — critical at scale where a full corpus may contain thousands of documents.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: What chunking strategy is used and why?</p>
+    <p class="qa-a">A: We use a fixed-size sliding window (500 words, 50 word overlap). The overlap ensures that content at chunk boundaries isn't lost — a sentence that spans two chunk boundaries will be partially present in both, preserving coherence. Tables are chunked separately to preserve their tabular structure.</p>
+  </div>
+
+  <h3><span class="badge badge-advanced">ADVANCED</span> Questions</h3>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: Scenario: A user asks "Compare Q3 revenue in our financial reports with the industry average from the web." How does the agent handle this?</p>
+    <p class="qa-a">A: The agent receives the query and enters the ReAct loop. Step 1: It calls <code>document_search("Q3 revenue financial reports")</code> to retrieve internal report chunks. Step 2: It calls <code>web_search("industry average Q3 revenue 2024")</code> to get current web data. Step 3: With both results in context, the LLM generates a grounded comparative answer citing both sources. Both citation sets are returned to the user.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: How do you prevent hallucinations in the agentic RAG system?</p>
+    <p class="qa-a">A: Multiple guardrails: (1) The system prompt explicitly instructs the LLM to only use retrieved context and cite sources. (2) Retrieved chunks are passed as grounding context, making it harder for the LLM to deviate. (3) Tool outputs contain actual data, so the LLM must synthesize from real evidence. (4) Citations are returned alongside the answer, allowing users to verify. (5) Max reasoning steps prevents recursive tool loops that could generate speculative chains.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: How is the chat thread designed for context carry-over?</p>
+    <p class="qa-a">A: Each thread has a unique GUID. Messages are stored in order. On each agent call, the last N messages (configurable via <code>MaxChatHistoryMessages</code>) are injected into the LLM message history before the new user query. This allows follow-up questions like "What did you just say about revenue?" to work correctly. Thread reset clears messages but keeps the ID, so the user can start fresh without breaking external references.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: How would you scale this system to millions of documents?</p>
+    <p class="qa-a">A: (1) Azure AI Search scales with partitions and replicas — add partitions to increase index capacity. (2) Switch from in-memory cache to distributed cache (Redis) for multi-instance API scaling. (3) Use Azure Durable Functions for the ingestion pipeline to handle parallelism and retries. (4) Switch <code>MemoryService</code> from in-memory dictionary to Azure Cosmos DB for persistent, distributed user memory. (5) Use Azure Event Grid to trigger ingestion asynchronously when new blobs arrive, rather than weekly polling.</p>
+  </div>
+
+  <div class="qa-block">
+    <p class="qa-q">Q: What are the cost optimization strategies in this design?</p>
+    <p class="qa-a">A: (1) Batch embedding generation reduces OpenAI API calls per ingestion job. (2) In-memory caching avoids re-running LLM calls for identical queries. (3) Incremental ingestion avoids re-embedding unchanged documents. (4) Serverless SQL (auto-pause) reduces database cost when idle. (5) Standard_LRS storage (lower redundancy) for document source (documents can be re-ingested if lost). (6) Max reasoning steps cap prevents runaway agent loops that consume tokens.</p>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  <p>Multimodal Agentic RAG — .NET 9 + Azure | Classic RAG (Phase 1) &amp; Agentic RAG (Phase 2) with Microsoft Agent Framework</p>
+</footer>
+
+</body>
+</html>
