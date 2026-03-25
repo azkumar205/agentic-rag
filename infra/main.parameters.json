@@ -1,0 +1,28 @@
+// ── Parameters file for main.bicep ──
+// Copy to main.bicepparam and fill in values before deployment.
+// Deploy: az deployment group create -g rg-agentic-rag -f main.bicep -p main.parameters.json
+
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "suffix": {
+      "value": "agentic01"
+    },
+    "location": {
+      "value": "centralindia"
+    },
+    "openAILocation": {
+      "value": "eastus2"
+    },
+    "sqlAdminUser": {
+      "value": "sqladmin"
+    },
+    "sqlAdminPassword": {
+      "value": ""
+    },
+    "appServiceSku": {
+      "value": "B1"
+    }
+  }
+}
