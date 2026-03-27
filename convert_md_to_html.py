@@ -352,7 +352,7 @@ blockquote:has(strong:first-child) {{
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <h2>Contents</h2>
-      <div class="book-title">Azure RAG Book</div>
+      <div class="book-title">{title}</div>
     </div>
     <div class="toc">
       {toc_html}
@@ -466,9 +466,11 @@ def main() -> None:
         title = src.stem.replace("-", " ").replace("_", " ")
         convert_file(src, out, title)
     else:
-        # Default: convert both guides
+        # Default: convert all guides
         books = [
             (Path("Documents/Azure-RAG-Complete-Book.md"), "Azure RAG — Complete Production Guide"),
+            (Path("Documents/Azure-RAG-Complete-Book-Part1.md"), "Azure RAG — Complete Book Part 1"),
+            (Path("Documents/Azure-RAG-Complete-Book-Part2.md"), "Azure RAG — Complete Book Part 2"),
             (Path("Documents/Agentic-RAG-Complete-Guide.md"), "Agentic RAG — Complete Guide"),
         ]
         for src, title in books:
