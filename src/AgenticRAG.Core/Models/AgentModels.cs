@@ -26,6 +26,7 @@ public class AgentResponse
     public List<string> ReasoningSteps { get; set; } = new();
     public int ReflectionScore { get; set; }
     public bool FromCache { get; set; }
+    public string ModelUsed { get; set; } = "";
     public TokenUsageInfo TokenUsage { get; set; } = new();
     public string SessionId { get; set; } = "";
 }

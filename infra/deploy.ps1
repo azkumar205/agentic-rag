@@ -68,6 +68,8 @@ $setupConfig = @{
         ApiKey              = $openAiKey
         EmbeddingDeployment = "text-embedding-3-large"
         EmbeddingDimensions = 1536
+        CacheEmbeddingDeployment = "text-embedding-3-small"
+        CacheEmbeddingDimensions = 512
     }
     BlobStorage = @{
         ConnectionString = $storageConnStr

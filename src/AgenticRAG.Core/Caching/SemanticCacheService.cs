@@ -6,13 +6,17 @@
 //   Semantic match — rephrased questions (cosine ≥ 0.92) also hit cache
 //
 // Uses Azure AI Search as the cache store: embeds the question into a
-// 3072-dim vector, stores it alongside the serialized AgentResponse.
+// vector, stores it alongside the serialized AgentResponse.
 // On lookup, does a vector search against cached questions with a TTL filter.
+//
+// Cost optimization: Uses text-embedding-3-small (512d) instead of
+// text-embedding-3-large (1536d) — 6.5x cheaper per embedding call.
+// This is safe because the cache index only compares question→question
+// vectors (independent from the document index which uses the large model).
 //
 // Impact: ~99.9% cost reduction and ~95% latency reduction on cache hits.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 using System.Text.Json;
-using Azure.AI.OpenAI;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using AgenticRAG.Core.Configuration;
@@ -24,20 +28,20 @@ namespace AgenticRAG.Core.Caching;
 public class SemanticCacheService
 {
     private readonly SearchClient _cacheClient;       // Points to the "semantic-cache" search index
-    private readonly EmbeddingClient _embeddingClient; // Generates vectors for cache key comparison
+    private readonly EmbeddingClient _embeddingClient; // text-embedding-3-small for cache (cheap)
     private readonly AgentSettings _settings;
-    private readonly int _dimensions;
+    private readonly int _dimensions;                  // 512 for cache (vs 1536 for doc search)
 
     public SemanticCacheService(
         SearchClient cacheClient,
-        AzureOpenAIClient openAIClient,
-        AzureOpenAISettings openAISettings,
+        EmbeddingClient cacheEmbeddingClient,
+        int cacheEmbeddingDimensions,
         AgentSettings agentSettings)
     {
         _cacheClient = cacheClient;
-        _embeddingClient = openAIClient.GetEmbeddingClient(openAISettings.EmbeddingDeployment);
+        _embeddingClient = cacheEmbeddingClient;
         _settings = agentSettings;
-        _dimensions = openAISettings.EmbeddingDimensions;
+        _dimensions = cacheEmbeddingDimensions;
     }
 
     /// <summary>

@@ -4625,271 +4625,324 @@ jobs:
 
 ---
 
-## 26. Agentic RAG — Production AI Agents
+## 26. Real-World Pain Points in Classic RAG
 
-### 26.1 What is an AI Agent?
+Classic RAG sounds simple in theory — retrieve, augment, generate. In production, teams hit painful issues that no tutorial covers. This chapter documents every major pain point from real Azure RAG deployments so you can **anticipate problems before they surface in production** — and answer interview questions about production experience convincingly.
 
-An **AI Agent** is an LLM that can **reason, plan, and take actions** — not just generate a single response. Instead of a one-shot "question → answer" flow, an agent iterates: it selects tools, observes results, and continues until the task is complete.
+### 26.1 Chunking Failures — The Silent Killer
 
-| Capability | Plain RAG | Agentic RAG |
-|-----------|-----------|-------------|
-| **Reasoning steps** | Single-pass | Multi-step (plan → act → observe → repeat) |
-| **Tool use** | None | Search indexes, call APIs, query databases |
-| **Autonomy** | Fixed pipeline | Dynamically decides what to do next |
-| **Handles ambiguity** | ❌ Returns single result | ✅ Clarifies intent and retries |
-
-**Core concept — the ReAct loop** (Reason + Act):
-
-```
-User question
-    │
-    ▼
-[Reason]  The model thinks about what it needs to do
-    │
-    ▼
-[Act]     Calls a tool (e.g., search_documents, get_metadata)
-    │
-    ▼
-[Observe]  Reads the tool's result
-    │
-    ▼
-[Reason]  Decides: is the task complete? If not, repeat.
-    │
-    ▼
-[Answer]  Synthesizes final response with citations
-```
-
----
-
-### 26.2 Agentic RAG vs Standard RAG
-
-Standard RAG is a linear, deterministic pipeline. Agentic RAG introduces **dynamic decision-making**:
-
-| Dimension | Standard RAG | Agentic RAG |
+| Pain Point | What Happens | Real Impact |
 |-----------|-------------|-------------|
-| **Flow** | Fixed: retrieve → augment → generate | Dynamic: agent decides each step |
-| **Tool calls** | One search call | Multiple calls across different indexes or APIs |
-| **Multi-document reasoning** | Limited to top-k chunks | Can search iteratively by entity, date, category |
-| **Latency** | ~1–2 s | ~5–15 s (model plans multiple steps) |
-| **Cost per query** | ~$0.01 | ~$0.05–$0.15 (3–10× more tokens) |
-| **Use when** | Simple Q&A, single-topic lookup | Comparison, synthesis, multi-hop reasoning |
+| **Tables split across chunks** | A table starts in chunk 47, ends in chunk 48. Neither chunk has the complete data. | GPT-4o hallucinates missing cells or gives partial answers. Users lose trust. |
+| **Headers separated from content** | "Section 14.2 — Termination Penalties" is in one chunk, the actual penalties are in the next. | Semantic search matches the header chunk (high relevance) but returns no useful content. |
+| **Overlap too small** | 50-token overlap on 1000-token chunks. Context at boundaries is lost. | "Payment terms are Net 30" ends chunk 5; "Late payments incur 2% penalty" starts chunk 6. Neither chunk alone answers "What are the payment terms?" |
+| **Overlap too large** | 400-token overlap on 1000-token chunks (40%). | 40% of your index is duplicated content. Storage costs rise. Search returns near-identical chunks, wasting context window tokens. |
+| **Fixed-size chunking on structured docs** | Legal contracts, policies, or manuals chunked at 1000 characters regardless of section boundaries. | A clause about "indemnification" gets split mid-sentence. The model sees half a clause and generates a dangerously incomplete legal answer. |
 
-> **Decision rule**: Start with standard RAG. Add agents only when users ask multi-step, multi-document, or "find X then do Y" questions that standard RAG cannot answer in one pass.
+> **🎯 Interview Point**: "In production, I switched from fixed-size chunking to layout-aware chunking using Document Intelligence paragraph roles. This eliminated table-splitting issues and kept logical sections intact. My retrieval precision improved from 62% to 84%."
 
----
-
-### 26.3 Tool Calling — How Agents Use Functions
-
-Modern LLMs (GPT-4o, Claude 3.5) support **structured tool calling**: you describe a function in JSON schema, and the model returns structured arguments to call it — not free-form text.
-
-**Tool definition (JSON schema)**:
-
-```json
-{
-  "name": "search_documents",
-  "description": "Search company documents. Use for questions about contracts, policies, procedures.",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "query":    { "type": "string",  "description": "The search query" },
-      "category": { "type": "string",  "description": "Optional document category filter" },
-      "top":      { "type": "integer", "description": "Number of results (default 5)" }
-    },
-    "required": ["query"]
-  }
-}
-```
-
-**Tool implementation (C#)**:
-
-```csharp
-/// <summary>
-/// Called by the LLM agent to search company documents via hybrid search.
-/// Returns formatted source blocks the model can cite in its final answer.
-/// </summary>
-/// <param name="query">Natural-language search query generated by the model.</param>
-/// <param name="category">Optional document category filter (e.g., "contracts", "policies").</param>
-/// <param name="top">Maximum number of results to return (default: 5).</param>
-public async Task<string> SearchDocumentsAsync(string query, string? category = null, int top = 5)
-{
-    var results = await _searchService.HybridSearchAsync(query, category, top);
-    if (results.Count == 0) return "No relevant documents found.";
-
-    var sb = new StringBuilder();
-    foreach (var (r, i) in results.Select((r, i) => (r, i + 1)))
-    {
-        sb.AppendLine($"[Source {i}] {r.Title} (page {r.PageNumber})");
-        sb.AppendLine(r.Content);
-        sb.AppendLine("---");
-    }
-    return sb.ToString();
-}
-```
-
-**Agent loop implementation (C#)**:
-
-```csharp
-public async Task<AgentResponse> ChatAsync(string userMessage, CancellationToken ct = default)
-{
-    var messages = new List<ChatMessage>
-    {
-        new("system", "You are a document assistant. Search before answering. "
-                    + "Cite every source. Never invent facts."),
-        new("user", userMessage)
-    };
-
-    var toolsUsed = new List<string>();
-    int maxIterations = _settings.AgentMaxIterations;  // configurable per deployment (default: 5)
-
-    for (int i = 0; i < maxIterations; i++)
-    {
-        var response = await _openAI.GetChatCompletionsAsync(
-            deploymentName: _settings.ChatDeployment,
-            messages,
-            tools: _toolDefinitions,
-            toolChoice: "auto",            // ← agent decides; "none" forces direct answer
-            cancellationToken: ct);
-
-        var choice = response.Choices[0];
-
-        // No more tool calls → final answer
-        if (choice.FinishReason == CompletionsFinishReason.Stop)
-        {
-            var answer = choice.Message.Content ?? "I couldn't generate a response.";
-            return new AgentResponse(answer, toolsUsed);
-        }
-
-        // Execute each requested tool call
-        foreach (var call in choice.Message.ToolCalls)
-        {
-            SearchArgs args;
-            try
-            {
-                args = JsonSerializer.Deserialize<SearchArgs>(call.Function.Arguments)
-                       ?? throw new InvalidOperationException("Null deserialization result.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to deserialize args for tool {Tool}: {Args}",
-                    call.Function.Name, call.Function.Arguments);
-                continue;  // skip malformed call; loop continues
-            }
-
-            var result = await SearchDocumentsAsync(args.Query, args.Category, args.Top);
-
-            toolsUsed.Add(call.Function.Name);
-            _logger.LogInformation("Tool call: {Tool} query={Query}", call.Function.Name, args.Query);
-
-            messages.Add(new("assistant", null) { ToolCalls = choice.Message.ToolCalls });
-            messages.Add(new("tool", result) { ToolCallId = call.Id });
-        }
-    }
-
-    return new AgentResponse(
-        "Unable to complete this request within the allowed reasoning steps. "
-      + "Try breaking your question into smaller parts.",
-        toolsUsed);
-}
-```
+**What actually works**:
+- Use Document Intelligence `prebuilt-layout` model to detect paragraphs, tables, and section headers
+- Never split tables — if a table exceeds max chunk size, keep it as an oversized chunk
+- Use 10-20% overlap (100-200 tokens on a 1000-token chunk)
+- A/B test chunk sizes: measure Context Precision and Recall, not just "does it work?"
 
 ---
 
-### 26.4 Real-World Agent Flow — Multi-Document Comparison
+### 26.2 Embedding Drift and Stale Indexes
 
-```
-User: "Compare termination clauses in the ACME and Globex vendor contracts."
+| Pain Point | What Happens | Real Impact |
+|-----------|-------------|-------------|
+| **Model version change** | Azure OpenAI updates `text-embedding-ada-002` or you switch to `text-embedding-3-large`. Old embeddings in the index are from the previous model. | New query embeddings don't match old document embeddings. Retrieval quality drops silently — no errors, just worse results. |
+| **Schema evolution** | You add a new field to chunks (e.g., `department`) but existing chunks don't have it. | Filters on `department` return zero results for older documents. Users think documents are missing. |
+| **Stale documents** | Policy v2 replaces v1, but v1 chunks are still in the index. | Search returns outdated policy. User follows wrong procedure. Compliance risk. |
+| **Index bloat** | Documents uploaded but never cleaned up. Index grows from 10K to 500K chunks over 18 months. | Search becomes slower, less precise (more noise in results), storage costs increase 50×. |
 
-Iteration 1 — Reason:
-  Model decides it needs ACME termination clause first.
-  → Calls search_documents(query="termination clause", category="contracts-acme", top=3)
-  ← Returns 3 ACME chunks with page refs
-
-Iteration 2 — Reason:
-  Model sees ACME result; needs Globex now.
-  → Calls search_documents(query="termination clause", category="contracts-globex", top=3)
-  ← Returns 3 Globex chunks with page refs
-
-Iteration 3 — Reason:
-  Both sources retrieved. FinishReason = Stop.
-  → Synthesizes side-by-side comparison with citations
-
-Tools used: [search_documents × 2]
-Total tokens: ~3,400   Cost: ~$0.07
-```
-
-This is impossible with single-pass RAG because a single `top=5` search would blend ACME and Globex chunks without ensuring both sides are covered.
+> **🎯 Interview Point**: "When we switched embedding models, I ran a full re-indexing job using Durable Functions with fan-out/fan-in. I kept the old index live, validated the new one with our 50-question test set, then swapped using blue-green deployment. Zero downtime, verified quality before cutover."
 
 ---
 
-### 26.5 Production Architecture for Agentic RAG
+### 26.3 Retrieval Quality Degradation
 
-```
-Client
-  │  POST /agent/chat  { userId, sessionId, message }
-  ▼
-Agent API (ASP.NET Core)
-  │
-  ├── ConversationStore (Azure Cosmos DB)   ← persistent, per-session history
-  │
-  ├── RateLimiter                           ← per-user token budget
-  │
-  ▼
-Agent Loop (max 5 iterations)
-  │
-  ├── Tool: search_documents → Azure AI Search (hybrid)
-  ├── Tool: get_document_metadata → Azure Blob metadata
-  └── Tool: summarize_section → secondary GPT-4o-mini call (cheap summarizer)
-  │
-  ▼
-Response  { answer, citations[], toolsUsed[], tokenUsage, durationMs }
-```
+| Pain Point | What Happens | Real Impact |
+|-----------|-------------|-------------|
+| **Query-document mismatch** | Users ask "What's the penalty for breaking the contract?" — but the document says "early termination fee." Keyword search misses it. | Zero results or irrelevant results. User thinks the system doesn't have the data. |
+| **Top-k too low** | `top=3` retrieves 3 chunks but the answer spans 5 relevant sections. | Partial answers. GPT-4o generates incomplete response or hallucinates the missing parts. |
+| **Top-k too high** | `top=20` retrieves 20 chunks, 15 are irrelevant noise. | Token budget exceeded. Irrelevant chunks confuse the model. Answer quality drops and cost increases. |
+| **No semantic ranking** | Using only hybrid search without the L2 reranker. | Results are "approximately relevant" but not precisely ordered. The most relevant chunk might be at position 7 instead of position 1. |
+| **Filter misuse** | Over-restricting with OData filters eliminates relevant results. | `category eq 'HR'` misses a relevant policy filed under `category eq 'Legal'`. |
 
-**Key production components**:
-
-| Component | Purpose | Azure Service |
-|-----------|---------|---------------|
-| **Conversation store** | Persist session history across requests | Azure Cosmos DB |
-| **Token budget** | Cap spend per user per day | Azure API Management / custom middleware |
-| **Tool registry** | Centrally register and version tool schemas | In-memory config or Azure App Config |
-| **Observability** | Trace every tool call with latency + tokens | Azure Application Insights |
-| **Circuit breaker** | Stop loop if search returns errors 3× | Polly library |
+> **🎯 Interview Point**: "I always enable semantic ranking (adds ~200ms but dramatically improves precision). I start with top=5, measure Context Precision, and increase only if Recall is below target. I also log which retrieved chunks GPT-4o actually uses vs ignores — chunks consistently ignored signal retrieval noise."
 
 ---
 
-### 26.6 Agent vs RAG API — Decision Framework
+### 26.4 Hallucination Despite Grounding
 
-| Scenario | Recommended Approach | Reason |
-|----------|---------------------|--------|
-| Simple Q&A on one topic | **Standard RAG API** | Fast (1–2 s), cheap, predictable |
-| Multi-document comparison | **Agentic RAG** | Needs separate searches per entity |
-| "Find X, then calculate Y" | **Agentic RAG** | Sequential dependency between steps |
-| Latency < 2 s required | **Standard RAG API** | Agents add 4–12 s of LLM reasoning |
-| Cost per query < $0.02 | **Standard RAG API** | Agents use 3–10× more tokens |
-| Compliance / audit trail needed | **Agentic RAG** | Every tool call is logged with args + result |
-| Ambiguous, open-ended research | **Agentic RAG** | Agent can refine its search iteratively |
+This is the most dangerous pain point — the system has context but still generates wrong answers.
 
-> **Production rule**: Route simple, single-intent questions through your standard RAG endpoint. Only invoke the agent for queries that explicitly require multi-hop reasoning. A lightweight intent classifier (fine-tuned or few-shot) upstream keeps costs predictable.
+| Pain Point | What Happens | Real Impact |
+|-----------|-------------|-------------|
+| **Ambiguous grounding prompt** | System prompt says "answer from context" but doesn't explicitly say "if context lacks the answer, say you don't know." | GPT-4o "fills in gaps" with training knowledge. Answer sounds authoritative but isn't from the document. |
+| **Context window overflow** | Too many chunks + long conversation history exceed the model's effective attention. | Model "forgets" earlier chunks and answers from the last few chunks only, missing critical information from earlier context. |
+| **Conflicting chunks** | Two document versions exist — v1 says "30-day notice" and v2 says "60-day notice." Both retrieved. | Model picks one randomly or combines them into a nonsensical "30-60 day notice period." |
+| **Numeric hallucination** | Model misreads "$1.5M" from context and generates "$1.5 billion" or "$150K." | Financial/legal decisions based on wrong numbers. Catastrophic in enterprise settings. |
 
----
-
-### 26.7 Production Best Practices
-
-| Practice | Implementation | Why It Matters |
-|----------|---------------|---------------|
-| **Hard iteration cap** | `maxIterations = 5` in the loop | Prevents runaway cost if model loops indefinitely |
-| **Per-user token budget** | Track via Redis; reject if exceeded | Protects per-user spend SLAs |
-| **Structured tool results** | Return JSON, not raw text | Reduces hallucination from poorly formatted context |
-| **Log every tool call** | Tool name, args, result size, latency | Required for debugging and cost attribution |
-| **Async cancellation** | Pass `CancellationToken` through the loop | Respects client timeouts; frees compute |
-| **Fallback to standard RAG** | If agent errors, retry as single-pass | Availability > perfection; surface error gracefully |
-| **Separate agent model** | Use `gpt-4o` for agents, `gpt-4o-mini` for tools | Balance quality and cost at each step |
-| **Session TTL** | Expire conversation history after 30 min idle | Prevents stale context from prior sessions polluting answers |
-
-> **🎯 Interview Point**: "Agentic RAG upgrades standard RAG with a ReAct loop — the model reasons, calls tools (like hybrid search), observes results, and iterates until the answer is complete. In production I cap iterations at 5, track per-user token budgets in Redis, log every tool call in Application Insights, and fall back to single-pass RAG on agent errors."
+> **🎯 Interview Point**: "I enforce grounding with a strict system prompt: 'Answer ONLY from [CONTEXT]. If the context does not contain the answer, respond with: I don't have enough information to answer this question. Never use your training knowledge.' I also set Temperature to 0.1 and require inline citations like [Source 1, Page 12]."
 
 ---
 
-## 27. Top 43 Interview Questions and Answers
+### 26.5 Cost Surprises in Production
+
+| Pain Point | What Happens | Real Impact |
+|-----------|-------------|-------------|
+| **Token burn from retries** | Failed API calls retry 3× with exponential backoff. Each retry consumes the full token allocation. | A 429 (rate limit) burst causes 3× cost spike with zero user-facing improvement. |
+| **Embedding re-generation** | Every document re-upload embeds from scratch instead of checking if content changed. | 10K documents × $0.0001/chunk × 200 chunks = $200/re-index. Weekly re-indexing = $10K/year wasted. |
+| **No caching** | Identical questions (e.g., "What is our PTO policy?") hit the full pipeline every time. | 500 employees asking the same 20 questions = 10K queries/month. With caching: 20 queries + 9,980 cache hits. |
+| **Wrong model for the job** | Using GPT-4o ($0.005/1K tokens) for simple FAQ-style answers that GPT-4o-mini ($0.00015/1K tokens) handles perfectly. | 33× cost premium for zero quality improvement on simple queries. |
+| **AI Search tier mismatch** | Starting with S1 Standard ($250/month) for a 1K-document proof of concept. | Basic tier ($75/month) handles this load easily. $2,100/year wasted. |
+
+> **🎯 Interview Point**: "I implement a query classifier that routes simple questions to GPT-4o-mini ($0.15/1M tokens) and complex multi-hop questions to GPT-4o ($5/1M tokens). I cache frequent queries in Redis with a 30-minute TTL. This reduced our monthly OpenAI spend by 60%."
+
+---
+
+### 26.6 Document Format Nightmares
+
+| Format | Pain Point | Solution |
+|--------|-----------|----------|
+| **Scanned PDFs** | No text layer — Document Intelligence returns empty or garbage. | Enable OCR with `prebuilt-read` model. Accept ~95% accuracy, not 100%. |
+| **Password-protected PDFs** | DI cannot open them. Pipeline fails silently. | Pre-processing step to detect and flag protected documents. Notify uploader. |
+| **Excel files** | Spreadsheets don't chunk well as linear text. | Convert each sheet to Markdown table format. Treat each table as a single chunk. |
+| **Multi-language documents** | English contract with French annexes. | Use `text-embedding-3-large` (multilingual). Set language-specific analyzers in AI Search. |
+| **Images embedded in PDFs** | Charts, diagrams, signatures. DI extracts text but loses visual context. | Log image presence as metadata. Use GPT-4o Vision for image-heavy documents (adds cost). |
+| **Large files (500+ pages)** | DI timeout on huge documents. | Split PDF into batches of 50 pages, process in parallel via Durable Functions, reassemble chunks. |
+
+> **🎯 Interview Point**: "I handle mixed-format documents by routing through a format-detection step first. Scanned PDFs go through OCR, Excel gets Markdown conversion, and 500+ page documents are batched into 50-page segments processed with Durable Functions fan-out."
+
+---
+
+### 26.7 Production Monitoring Blind Spots
+
+| Blind Spot | What You Miss | What to Monitor Instead |
+|-----------|-------------|------------------------|
+| **Only monitoring uptime** | System is "up" but returning wrong answers for 3 weeks. | Track reranker score distribution — a drop signals retrieval degradation. |
+| **No golden test set** | No baseline to detect quality regression. | Run 50 golden questions weekly. Alert if Groundedness drops below 0.85. |
+| **Ignoring token usage trends** | Costs creep up 20% month-over-month unnoticed. | Dashboard with daily token spend per model, per endpoint. Alert on >10% deviation. |
+| **No user feedback loop** | Users silently stop using the system. | Add thumbs up/down. Track usage per day. Drop in usage = quality problem. |
+| **Ignoring search latency** | p50 is 200ms but p99 is 8 seconds. | Monitor p50, p95, p99 latency. Alert if p99 > 3 seconds. |
+
+> **🎯 Interview Point**: "I monitor RAG quality with a golden test set of 50 questions run weekly via CI. If Groundedness drops below 0.85 or Context Precision below 0.75, the pipeline alerts the team. We also track reranker score distributions — a shift means search quality is degrading even if the app is 'working.'"
+
+---
+
+## 27. Market Expectations for RAG Engineers (2025)
+
+### 27.1 What Employers Actually Want
+
+The RAG/AI engineering market has matured rapidly. Employers no longer want "I followed a tutorial." They want **production experience, cost awareness, and debugging skills**.
+
+| Expectation | What It Means in Practice | How to Demonstrate |
+|------------|--------------------------|-------------------|
+| **Production RAG experience** | You've deployed a working system that real users query daily. Not just a Jupyter notebook. | "I built and deployed a .NET RAG API on Azure that serves 500+ queries/day with hybrid search and semantic ranking." |
+| **Cost optimization** | You understand the cost per query and have actively reduced it. | "I reduced monthly OpenAI spend by 60% using query classification (GPT-4o-mini for simple queries) and Redis caching." |
+| **Chunking strategy knowledge** | You can explain WHY you chose a chunking strategy, not just WHAT you used. | "I use layout-aware chunking with DI paragraph roles because fixed-size chunking split our tables and caused hallucination." |
+| **Evaluation metrics** | You measure retrieval quality, not just "it works." | "Our golden test set of 50 questions runs weekly, measuring Groundedness (0.91), Context Precision (0.85), and Relevance (0.88)." |
+| **Azure security basics** | Managed Identity, RBAC, Private Endpoints — not API keys in config files. | "Zero API keys in our deployments. DefaultAzureCredential everywhere, RBAC least-privilege roles, Private Endpoints for Search and OpenAI." |
+| **Debugging skills** | When "it gives wrong answers," you can diagnose WHERE the failure is (retrieval? prompt? model?). | "I trace the pipeline: check retrieved chunks first (is the right content found?), then check the prompt (is context formatted correctly?), then check model output." |
+
+---
+
+### 27.2 Job Roles and Expected Skills
+
+| Role | Expected RAG Skills | Typical Interview Focus |
+|------|-------------------|----------------------|
+| **Junior AI/ML Engineer (0-2 yrs)** | Build basic RAG pipeline, understand embeddings, chunking, hybrid search. Deploy to Azure. | "Build me a RAG system" — architecture, chunking, search types. |
+| **Mid-Level AI Engineer (2-4 yrs)** | Production deployment, cost optimization, evaluation metrics, CI/CD, monitoring. | "Your RAG gives wrong answers — debug it." "Optimize costs by 50%." |
+| **Senior AI Engineer (4+ yrs)** | System design for scale, multi-tenant architecture, security hardening, team mentoring. | "Design a RAG system for 10K users across 3 regions with document-level access control." |
+| **.NET Developer adding AI** | Integrate RAG into existing .NET applications. Azure SDK proficiency. | "Add document Q&A to our existing ASP.NET app." Focus on SDK usage, DI patterns. |
+| **Cloud/DevOps Engineer** | Infrastructure for RAG — networking, scaling, monitoring, cost controls. | "Set up Azure infrastructure for a RAG system with private endpoints and auto-scaling." |
+
+---
+
+### 27.3 Salary and Market Trends (2025)
+
+| Market Signal | What It Means for You |
+|-------------|---------------------|
+| **RAG is table stakes** | Every AI team implements RAG. It's no longer a differentiator — it's a baseline skill. |
+| **Production experience is the differentiator** | Tutorials are everywhere. Companies pay premium for "I've deployed and maintained a production RAG system." |
+| **Cost awareness is critical** | Companies burned by GPT-4 bills now demand cost-optimized architectures. Show you understand cost per query. |
+| **Evaluation skills are rare** | Most candidates say "it works." Few can explain Groundedness, Context Precision, or how to build a golden test set. |
+| **Azure + .NET is high demand** | Enterprise market (finance, healthcare, legal) overwhelmingly runs on Azure + .NET. This combination has less competition than Python + OpenAI API. |
+| **Multi-modal is emerging** | GPT-4o Vision, image search, audio transcription + RAG. Not required yet, but differentiating. |
+
+> **🎯 Interview Point**: "The market has moved from 'can you build RAG?' to 'can you build RAG that runs in production at scale, costs $X per query, and maintains quality metrics above Y?' I focus on production-grade systems with measurable quality, optimized costs, and zero-secret security."
+
+---
+
+### 27.4 Skills Gap — What Most Candidates Lack
+
+| Skill Gap | What Interviewers See | How to Fill It |
+|----------|---------------------|---------------|
+| **No cost awareness** | "I used GPT-4o for everything" — no mention of cost per query or model routing. | Calculate your cost per query. Implement model routing. Know Azure pricing by heart. |
+| **No evaluation** | "It worked well in testing" — no metrics, no golden test set. | Build a 50-question test set. Run Groundedness, Precision, Recall. Show results. |
+| **No debugging story** | Cannot explain how to diagnose "wrong answers." | Practice the debugging flow: check retrieval → check prompt → check model → check grounding. |
+| **No security awareness** | API keys in appsettings.json, no mention of Managed Identity. | Remove all API keys. Use DefaultAzureCredential. Know RBAC roles by name. |
+| **Tutorial-only experience** | "I followed a Microsoft Learn tutorial" — no custom chunking, no production deployment. | Build YOUR system. Deploy it. Have a GitHub repo with YOUR code, YOUR decisions. |
+
+---
+
+## 28. Scenario-Based Interview Questions (1-2 Years Experience)
+
+These are the questions interviewers ask to test **real-world problem-solving**, not textbook knowledge. Each scenario simulates a production situation you'd encounter as a junior-to-mid RAG engineer.
+
+### 28.1 Retrieval Scenarios
+
+**Scenario 1: "Users report that the system returns irrelevant results for contract-related questions. How do you debug this?"**
+
+> **Strong answer**: "I'd debug in three steps:
+> 1. **Check retrieved chunks** — Run the same query directly against Azure AI Search and examine what chunks come back. Are they from the right documents? Are they actually about contracts?
+> 2. **Check the query** — Is the user's question matching the vocabulary in the documents? If documents say 'agreement' and users say 'contract,' keyword search might miss them. This is why hybrid search is critical — vector search catches semantic matches.
+> 3. **Check chunk quality** — Open the actual chunks in the index. Are they well-formed? Or were tables/headers split badly during chunking?
+>
+> Most likely fix: Switch from fixed-size to layout-aware chunking, and confirm hybrid search + semantic ranking are enabled."
+
+**Scenario 2: "A developer on your team says 'just increase top-k to 20 to get better results.' What do you say?"**
+
+> **Strong answer**: "I'd push back. Increasing top-k from 5 to 20 means quadrupling the context sent to GPT-4o. This causes three problems:
+> 1. **Cost** — 4× more tokens per query. At scale, this blows the budget.
+> 2. **Noise** — 15 of those 20 chunks are likely irrelevant. The model gets confused by noise and may hallucinate.
+> 3. **Context window** — With conversation history + system prompt + 20 chunks, you risk exceeding the effective attention window.
+>
+> Instead, I'd improve retrieval quality: enable semantic ranking, tune the search query, or improve chunk quality. Better top-5 beats noisy top-20."
+
+**Scenario 3: "Your search returns zero results for 'PTO policy' but the document exists in the index. What's happening?"**
+
+> **Strong answer**: "Three possible causes:
+> 1. **Filter too restrictive** — If the query includes an OData filter like `category eq 'Legal'` but the document was tagged as `category eq 'HR'`, it's filtered out before search even runs.
+> 2. **Embedding mismatch** — If we changed embedding models after this document was indexed, its embeddings are from the old model. New query embeddings don't align.
+> 3. **Indexing failure** — The document upload may have succeeded (blob stored) but the indexing step failed silently. Check indexer status.
+>
+> First step: Search without filters to see if the chunks exist. Then check the indexer run history."
+
+---
+
+### 28.2 Production Scenarios
+
+**Scenario 4: "Your RAG system has been running fine for 3 months. Suddenly, answer quality drops but the system is 'up.' Walk me through your investigation."**
+
+> **Strong answer**: "Quality regression without downtime usually means one of three things:
+> 1. **New documents polluting the index** — Someone uploaded documents that are poorly formatted, very large, or from a different domain. These chunks dilute search quality.
+> 2. **Embedding model version change** — Azure may have updated the embedding model deployment. Old embeddings no longer align with new query embeddings.
+> 3. **Data drift** — Users are asking different types of questions than what the system was tuned for.
+>
+> Investigation: Run the golden test set (50 questions with known answers). Compare current scores to baseline. If Context Precision dropped, it's a retrieval problem. If Groundedness dropped, it's a prompt/model problem. Check the indexer logs for recent document ingestion activity."
+
+**Scenario 5: "Your monthly Azure OpenAI bill jumped from $500 to $2,000. The product manager asks you to cut costs. What do you do?"**
+
+> **Strong answer**: "I'd investigate in priority order:
+> 1. **Identify the cost driver** — Check Application Insights: which endpoint is burning tokens? Is it embeddings or chat completions? Is one user/query type causing most of the spend?
+> 2. **Implement query caching** — Redis cache with 30-minute TTL for frequent queries. In most enterprises, 20% of questions account for 80% of volume.
+> 3. **Model routing** — Route simple single-intent questions to GPT-4o-mini ($0.15/1M tokens) and only send complex questions to GPT-4o ($5/1M tokens). A simple intent classifier (few-shot) costs pennies.
+> 4. **Reduce top-k** — Drop from top=10 to top=5 if evaluation metrics hold. Halves context tokens per query.
+> 5. **Check for embedding re-generation waste** — Are we re-embedding unchanged documents? Implement content hashing to skip unchanged files."
+
+**Scenario 6: "A compliance officer asks: 'How do we know the AI isn't making things up?' How do you respond?"**
+
+> **Strong answer**: "I'd explain our four layers of grounding:
+> 1. **System prompt** — The AI is explicitly instructed: 'Answer ONLY from provided context. If context doesn't contain the answer, say so.'
+> 2. **Citations** — Every answer includes inline source references: document name, page number. The user can click to verify.
+> 3. **Temperature** — Set to 0.1 (near-deterministic). The model doesn't 'create' — it extracts from context.
+> 4. **Evaluation** — We run a weekly Groundedness test against 50 known Q&A pairs. Current score: 0.91 (91% of answers are fully supported by retrieved context).
+>
+> 'The AI cannot access anything outside the documents we've indexed. And we measure how well it sticks to those documents every week.'"
+
+---
+
+### 28.3 Architecture and Design Scenarios
+
+**Scenario 7: "Your team needs to build a document Q&A system in 2 weeks. It needs to handle PDFs, Word docs, and Excel files. What's your approach?"**
+
+> **Strong answer**: "I'd use the Managed path to save time:
+> 1. **Week 1**: Set up Azure AI Search with integrated vectorization (indexer + skillset auto-processes all documents). Connect Blob Storage as data source. Upload sample documents. Verify index population and run test queries.
+> 2. **Week 2**: Build a .NET query API using `VectorizableTextQuery` for hybrid search + semantic ranking. Add GPT-4o with a grounding system prompt. Deploy to App Service. Set up basic monitoring.
+>
+> For Excel specifically: convert to CSV before upload, or customize the skillset to handle tabular extraction.
+> This avoids writing custom ingestion code and gets a working system in 2 weeks. We can migrate to custom path later if we need more control over chunking."
+
+**Scenario 8: "We have 50,000 documents across 10 departments. Each department should only see their own documents. How do you implement this?"**
+
+> **Strong answer**: "Document-level access control through metadata filtering:
+> 1. **At ingestion**: Tag every chunk with a `department` field (e.g., 'HR', 'Legal', 'Finance').
+> 2. **At query time**: The API extracts the user's department from their Azure AD token claims. It adds an OData filter: `department eq 'HR'` to every search query.
+> 3. **Security**: The filter is applied server-side in the API — never passed from the client. Users cannot bypass it.
+>
+> For multi-department access: the filter becomes `search.in(department, 'HR,Legal')` based on the user's role claims.
+> This is the most practical approach because it uses Azure AI Search's built-in filtering — no separate indexes per department."
+
+**Scenario 9: "The CTO wants to add a chatbot to the company intranet. They say 'just use ChatGPT.' How do you explain why that won't work?"**
+
+> **Strong answer**: "I'd explain three risks:
+> 1. **Data privacy** — ChatGPT sends company data to OpenAI's servers. We can't control how it's stored or used. Compliance (GDPR, HIPAA) may prohibit this.
+> 2. **No access to internal data** — ChatGPT doesn't know our contracts, policies, or procedures. It would answer from general knowledge, which is often wrong for company-specific questions.
+> 3. **No citations** — ChatGPT can't point to 'Section 14.2 of the vendor contract.' Without citations, employees can't verify answers.
+>
+> 'Instead, we build a RAG system on Azure. Data stays in our tenant, answers come from OUR indexed documents, every response includes citations. It's ChatGPT's quality but with our data and our security controls.'"
+
+---
+
+### 28.4 Debugging and Troubleshooting Scenarios
+
+**Scenario 10: "GPT-4o responds with 'I don't have enough information to answer this question' even though you know the document is in the index. What went wrong?"**
+
+> **Strong answer**: "The document exists but the RIGHT chunks weren't retrieved. I'd check:
+> 1. **Search query alignment** — Run the user's exact question against the search index API. Are the relevant chunks in the top 5?
+> 2. **Chunking** — Open the actual chunks. Is the answer content in one chunk, or was it split across multiple chunks and diluted?
+> 3. **Semantic ranking** — Is it enabled? The right chunk might be at position 8 without reranking but position 1 with it.
+> 4. **Filters** — Are filters accidentally excluding the relevant chunks?
+>
+> Most common cause: the content IS retrieved but the chunk has too much noise (irrelevant surrounding text), so the model's grounding prompt correctly says 'not enough information.' The fix is better chunking, not a weaker grounding prompt."
+
+**Scenario 11: "Your RAG system gives a different answer to the same question when asked twice. The product manager calls it 'unreliable.' What's the fix?"**
+
+> **Strong answer**: "Non-deterministic answers come from two sources:
+> 1. **Temperature > 0** — If Temperature is set to 0.3 or higher, the model samples differently each time. Fix: set Temperature to 0.1 or 0.0 for factual Q&A.
+> 2. **Different search results** — If the index is being updated concurrently, search may return slightly different chunks between queries. Fix: confirm ingestion isn't running during the test, or add a cache layer.
+>
+> Quick fix: Temperature = 0.1 + Redis cache (30-min TTL). Same question within 30 minutes returns the identical answer. For compliance use cases, I'd add response logging so we have an audit trail of every answer given."
+
+**Scenario 12: "During load testing, your RAG API returns 429 errors from Azure OpenAI at 100 concurrent users. How do you fix this?"**
+
+> **Strong answer**: "429 means we've hit the tokens-per-minute (TPM) quota. Five-step fix:
+> 1. **Check current quota** — Azure Portal → OpenAI → Quotas. Default might be 30K TPM.
+> 2. **Request increase** — Azure allows up to 240K+ TPM on standard deployments. Submit increase request.
+> 3. **Add retry with backoff** — Azure SDK has built-in retry. Confirm it's configured (default: 3 retries, exponential backoff).
+> 4. **Add caching** — Redis cache for frequent queries. If 30% of queries are repeats, that's 30% less load on OpenAI.
+> 5. **Multi-region deployment** — Deploy the same model in East US and West US. Load balance between them. Doubles effective TPM.
+>
+> Long-term: consider Provisioned Throughput Units (PTU) for predictable, guaranteed capacity instead of pay-as-you-go."
+
+---
+
+### 28.5 Communication and Soft-Skill Scenarios
+
+**Scenario 13: "A business stakeholder asks: 'Why does the AI sometimes say it doesn't know? It should ALWAYS give an answer.' How do you handle this?"**
+
+> **Strong answer**: "I'd explain that saying 'I don't know' is a FEATURE, not a bug:
+> 'When the AI says it doesn't know, it means the search didn't find relevant content in our documents. This is much better than the alternative — the AI making up an answer that sounds right but is wrong. In legal, compliance, or financial contexts, a confident wrong answer can cause real damage.
+>
+> We can improve coverage over time: upload more documents, improve chunking, expand the search scope. But we should never remove the safety guard that prevents the AI from guessing.'"
+
+**Scenario 14: "The CEO saw a demo of GPT-4o and says 'I want that for our company by Friday.' What do you do?"**
+
+> **Strong answer**: "I'd scope a realistic MVP:
+> 1. **Friday target** — We can have a working demo with the Managed path: Azure AI Search indexer + GPT-4o. Not production-ready, but demonstrates the concept with real company documents.
+> 2. **What the CEO will see** — Upload 10-20 representative documents, ask questions, get cited answers. Show 'our data, our control.'
+> 3. **What I'll communicate** — 'This demo works for 10 documents and 1 user. Production requires security (Managed Identity, Private Endpoints), evaluation (quality metrics), monitoring (Application Insights), and proper CI/CD. Timeline for production: 4-6 weeks.'
+>
+> Never say 'no' to execs — say 'yes, here's what we can show by Friday, and here's what production requires.'"
+
+---
+
+## 29. Top 40 Interview Questions and Answers
 
 ### Conceptual Questions (Q1-Q8)
 
@@ -5002,104 +5055,32 @@ Response  { answer, citations[], toolsUsed[], tokenUsage, durationMs }
 **Q33: Blob trigger vs HTTP trigger?**
 > Blob trigger fires automatically when a file appears in storage — no API call needed. HTTP trigger requires explicit API call. Use Blob for automated pipelines, HTTP when you need validation or tracking URL.
 
-**Q34: What is Agentic RAG and how does it differ from standard RAG?**
-> Standard RAG is a fixed pipeline: retrieve → augment → generate (one pass, deterministic). Agentic RAG adds a ReAct loop: the LLM reasons, calls tools (search, APIs), observes results, and iterates until the answer is complete. Use agentic RAG for multi-hop or multi-document tasks; standard RAG for simple Q&A where speed and cost matter.
-
-**Q35: Agent vs simple RAG API — when do you choose each?**
-> Simple RAG: question → search → answer (fast ~1–2 s, cheap ~$0.01/query, predictable). Agent: question → plan → multiple tool calls → synthesize (slower ~5–15 s, costlier ~$0.05–$0.15/query, handles multi-step reasoning). Route single-intent queries through standard RAG; only invoke the agent for multi-hop, comparison, or open-ended research questions.
-
-**Q36: How do you prevent agent runaway in production?**
-> Hard iteration cap (maxIterations = 5) in the loop; per-user daily token budget tracked in Redis; cancel via `CancellationToken` on client timeout; alert in Application Insights when a session exceeds 3,000 tokens; fall back to single-pass RAG if the agent errors out.
-
-**Q37: What are the main chunking strategies?**
+**Q34: What are the main chunking strategies?**
 > (1) Fixed-size — splits at char count, breaks words. (2) Sentence-based — splits at sentences with overlap, good default. (3) Sliding window — high overlap for discovery. (4) Recursive — splits by largest unit first. (5) Layout-aware (recommended) — uses DI paragraph roles for section boundaries. (6) Semantic — embedding similarity detects topic changes, highest quality but expensive.
 
-**Q38: How do metadata filters improve search?**
+**Q35: How do metadata filters improve search?**
 > Narrow search space BEFORE scoring. Instead of 10K chunks, filter to `Category eq 'contracts'` (1.2K chunks), then hybrid search. Higher precision, faster execution, enables access control.
 
-**Q39: Why is overlap important in chunking?**
+**Q36: Why is overlap important in chunking?**
 > Without overlap, information at chunk boundaries splits across two chunks. "Payment is Net 30" ends chunk 5, "Late payments incur 2% interest" starts chunk 6. With overlap, both appear together. Typical: 10-20% of chunk size.
 
-**Q40: How do you handle tables during chunking?**
+**Q37: How do you handle tables during chunking?**
 > Never split tables across chunks. If table fits with current chunk, append. If not, flush chunk first, then add table. If table alone exceeds max size, accept oversized chunk. Serialize as Markdown for GPT-4.
 
-**Q41: What chunk size should you use?**
+**Q38: What chunk size should you use?**
 > Start with 1000 tokens / 200 overlap. Legal: 800-1200 (clauses are self-contained). FAQs: 200-400 (each Q&A is a chunk). Optimize: measure retrieval quality, A/B test sizes, log which chunks GPT-4 actually uses vs ignores.
 
-**Q42: Custom vs Managed RAG — how do you decide?**
+**Q39: Custom vs Managed RAG — how do you decide?**
 > Custom: full control over extraction/chunking/embedding, can use Free/Basic Search tier, needs .NET developers. Managed: zero ingestion code, automatic scheduling, needs Standard S1 ($250/mo). Choose based on chunking needs, budget, and team skills.
 
-**Q43: How would you migrate from custom to managed?**
+**Q40: How would you migrate from custom to managed?**
 > Create S1 search, configure data source + skillset + index + indexer, upload existing docs to blob, run indexer, update query code from `VectorizedQuery` to `VectorizableTextQuery`, remove ingestion code, split CI/CD into app + document pipelines.
 
 ---
 
-## 28. 20-Day Study Plan
+## 30. Azure AI Foundry Prompt Flow — Quick Start
 
-### 28.1 Daily Format (120 Minutes)
-
-| Block | Time | Goal |
-|---|---|---|
-| Concept | 30 min | Read chapter sections, explain key ideas in your own words |
-| Practical | 75 min | Build or improve one working piece (code, Azure config, diagram) |
-| Wrap-up | 15 min | Write notes, commit code, list tomorrow's first task |
-
-### 28.2 Day-by-Day Plan
-
-| Day | Theme | Chapters | Practical Task | Interview Win |
-|---|---|---|---|---|
-| 1 | RAG Foundations | Ch 1-3 | Write "What problem my RAG solves" + draw architecture | Explain RAG in 60 seconds |
-| 2 | Azure Provisioning | Ch 4 (Custom) or Ch 11 (Managed) | Create all Azure resources | Explain each service's role |
-| 3 | Document Intelligence | Ch 5 (sections 5.1-5.4) or Ch 12 (skillset) | Extract text from one PDF | Explain DI + which model |
-| 4 | Project Bootstrapping | Ch 5 (continue) or Ch 13 | Scaffold .NET project, run locally | Explain project structure |
-| 5 | Ingestion Pipeline | Ch 6 | Build upload → extract → chunk → embed → index | Explain ingestion flow |
-| 6 | Search Fundamentals | Ch 6 (search section) or Ch 13 | Run keyword vs vector search comparison | Explain hybrid search |
-| 7 | Query Pipeline | Ch 7 | Build search → rerank → GPT-4o → citations | Explain query flow |
-| 8 | Legal Document Support | Ch 8 | Process a legal doc, test clause extraction | Explain structure-aware extraction |
-| 9 | Deploy Day | Ch 9 (Custom) or Ch 14 (Managed) | Deploy to Azure, verify health endpoint | Explain deployment steps |
-| 10 | CI/CD Setup | Ch 9 or Ch 14 (CI/CD sections) | Create GitHub Actions pipeline | Explain CI/CD strategy |
-| 11 | Security | Ch 10 or Ch 15 | Configure MI, RBAC, Key Vault | Explain secure-by-default |
-| 12 | Monitoring | Ch 10 or Ch 15 (monitoring) | Set up Application Insights, create dashboard | Explain monitoring approach |
-| 13 | Custom vs Managed | Ch 16-17 | Write decision doc with pros/cons | Explain both paths clearly |
-| 14 | Cost Optimization | Ch 18 | Calculate expected costs, implement caching | Explain cost drivers |
-| 15 | Scaling | Ch 19 | Configure auto-scaling rules | Explain scaling axes |
-| 16 | Prompt Engineering | Ch 20 | Tune system prompt, test different patterns | Explain grounding strategy |
-| 17 | Evaluation | Ch 21 | Build 20-question test set, measure metrics | Explain groundedness |
-| 18 | Safety + Troubleshooting | Ch 22-23 | Add input validation, run failure drills | Explain content safety |
-| 19 | Functions + Agents | Ch 25-26 | Set up Durable Functions orchestrator or SK agent | Explain orchestration pattern |
-| 20 | Interview + Polish | Ch 27 + Ch 28 | Practice all 43 Qs aloud, polish GitHub README | Give crisp answers confidently |
-
-### 28.3 Keep-Interest Rules
-
-- **Never do only reading.** Every day must end with visible output.
-- **One "win" daily** — something that runs, deploys, or improves results.
-- **Blocked > 25 minutes?** Write the blocker and switch to a smaller task.
-
-### 28.4 Daily Tracker
-
-| Day | Concept Done | Practical Done | Commit Link | Confidence (1-5) | Blocker |
-|---|---|---|---|---|---|
-| 1 | | | | | |
-| 2 | | | | | |
-| ... | | | | | |
-| 20 | | | | | |
-
-### 28.5 Job-Ready Exit Criteria
-
-You are ready to apply when ALL are true:
-
-1. ✅ You can rebuild core RAG flow from scratch
-2. ✅ You have one deployed app URL
-3. ✅ You understand both custom and managed paths
-4. ✅ You have evaluation metrics (not just "it works")
-5. ✅ You can explain architecture and trade-offs in 5 minutes
-6. ✅ You have a polished GitHub project with clear README
-
----
-
-## 29. Azure AI Foundry Prompt Flow — Quick Start
-
-### 29.1 What is Prompt Flow?
+### 30.1 What is Prompt Flow?
 
 Prompt Flow is a **visual development tool** inside Azure AI Foundry (formerly Azure AI Studio) for building, testing, and deploying AI workflows — including RAG.
 
@@ -5121,7 +5102,7 @@ Prompt Flow is a **visual development tool** inside Azure AI Foundry (formerly A
 
 > **Key insight**: Prompt Flow is NOT a replacement for code-based RAG. It's a complementary tool for prototyping and evaluation. Most production .NET teams use code. But knowing Prompt Flow shows breadth in interviews.
 
-### 29.2 When to Use Prompt Flow
+### 30.2 When to Use Prompt Flow
 
 | Scenario | Use Prompt Flow? | Use Code (Part 2/3)? |
 |----------|-----------------|---------------------|
@@ -5132,7 +5113,7 @@ Prompt Flow is a **visual development tool** inside Azure AI Foundry (formerly A
 | CI/CD with GitHub Actions | ❌ Extra work | ✅ Native |
 | Custom retry/error handling | ❌ Limited | ✅ Full control |
 
-### 29.3 Step-by-Step: Build a RAG Flow in Prompt Flow
+### 30.3 Step-by-Step: Build a RAG Flow in Prompt Flow
 
 #### Step 1: Open Azure AI Foundry
 
@@ -5237,7 +5218,7 @@ This is where Prompt Flow shines over pure code:
 
 Result: A dashboard showing scores per question + overall averages.
 
-### 29.4 Deploy as an Endpoint (Optional)
+### 30.4 Deploy as an Endpoint (Optional)
 
 ```
 > Deploy (top menu) > Deploy to endpoint
@@ -5252,7 +5233,7 @@ curl -X POST "https://rag-chat-endpoint.centralindia.inference.ml.azure.com/scor
   -d '{"question": "What are the termination penalties?"}'
 ```
 
-### 29.5 Prompt Flow vs Your Code — Side by Side
+### 30.5 Prompt Flow vs Your Code — Side by Side
 
 | What You Built (Part 2) | Same Thing in Prompt Flow |
 |------------------------|---------------------------|
@@ -5267,7 +5248,7 @@ curl -X POST "https://rag-chat-endpoint.centralindia.inference.ml.azure.com/scor
 
 > **The trade-off**: Prompt Flow is fast to build but limited in customization. Your C# code is slower to build but gives full control over chunking, retry logic, caching, and CI/CD.
 
-### 29.6 Interview-Ready Answers About Prompt Flow
+### 30.6 Interview-Ready Answers About Prompt Flow
 
 **"What is Prompt Flow?"**
 > "It's a visual orchestration tool in Azure AI Foundry for building and evaluating AI workflows. I use it for rapid prototyping and prompt evaluation, but for production I prefer code-based pipelines because they give full control over chunking strategies, error handling, and CI/CD."
@@ -5322,8 +5303,7 @@ curl -X POST "https://rag-chat-endpoint.centralindia.inference.ml.azure.com/scor
 | **Groundedness** | Metric: is the AI's answer supported by the retrieved context |
 | **Durable Functions** | Azure Functions extension for long-running, stateful orchestrations |
 | **Fan-Out/Fan-In** | Pattern: launch N parallel tasks, wait for all to complete |
-| **Agentic RAG** | RAG pattern extended with a ReAct loop: the model reasons, calls tools (search, APIs), observes results, and iterates to complete multi-step tasks |
-| **AI Agent** | LLM that can autonomously plan and execute tool calls |
+
 | **Prompt Flow** | Visual workflow builder in Azure AI Foundry for prototyping and evaluating AI pipelines |
 | **Azure AI Foundry** | Microsoft's platform (formerly AI Studio) for building, evaluating, and deploying AI apps |
 | **Blue-Green Deployment** | Running two versions simultaneously, switching traffic to new one |

@@ -16,8 +16,11 @@ public class AzureOpenAISettings
 {
     public string Endpoint { get; set; } = "";
     public string ChatDeployment { get; set; } = "gpt-4o";
+    public string PlanningDeployment { get; set; } = "gpt-4o-mini";
     public string EmbeddingDeployment { get; set; } = "text-embedding-3-large";
     public int EmbeddingDimensions { get; set; } = 1536;
+    public string CacheEmbeddingDeployment { get; set; } = "text-embedding-3-small";
+    public int CacheEmbeddingDimensions { get; set; } = 512;
 }
 
 public class SqlServerSettings

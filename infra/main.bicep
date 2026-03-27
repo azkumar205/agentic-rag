@@ -110,6 +110,42 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   dependsOn: [gpt4oDeployment]   // Serial deployment to avoid conflicts
 }
 
+// ── Cost Optimization: GPT-4o-mini (planning, reflection, summarization) ──
+resource gpt4oMiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+  parent: openAI
+  name: 'gpt-4o-mini'
+  sku: {
+    name: 'Standard'
+    capacity: 30
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4o-mini'
+      version: '2024-07-18'
+    }
+  }
+  dependsOn: [embeddingDeployment]
+}
+
+// ── Cost Optimization: text-embedding-3-small (semantic cache only) ──
+resource cacheEmbeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+  parent: openAI
+  name: 'text-embedding-3-small'
+  sku: {
+    name: 'Standard'
+    capacity: 120
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-small'
+      version: '1'
+    }
+  }
+  dependsOn: [gpt4oMiniDeployment]
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 4. Storage Account + Containers
 // ═══════════════════════════════════════════════════════════════
@@ -247,7 +283,11 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'AzureAISearch__Endpoint', value: 'https://${search.name}.search.windows.net' }
         { name: 'AzureOpenAI__Endpoint', value: openAI.properties.endpoint }
         { name: 'AzureOpenAI__ChatDeployment', value: 'gpt-4o' }
+        { name: 'AzureOpenAI__PlanningDeployment', value: 'gpt-4o-mini' }
         { name: 'AzureOpenAI__EmbeddingDeployment', value: 'text-embedding-3-large' }
+        { name: 'AzureOpenAI__EmbeddingDimensions', value: '1536' }
+        { name: 'AzureOpenAI__CacheEmbeddingDeployment', value: 'text-embedding-3-small' }
+        { name: 'AzureOpenAI__CacheEmbeddingDimensions', value: '512' }
         { name: 'SqlServer__ConnectionString', value: 'Server=${sqlServer.properties.fullyQualifiedDomainName};Database=${sqlDbName};User Id=${sqlAdminUser};Password=${sqlAdminPassword};Encrypt=True;TrustServerCertificate=False;' }
         { name: 'BlobStorage__ConnectionString', value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value}' }
         { name: 'Redis__ConnectionString', value: '${redis.properties.hostName}:${redis.properties.sslPort},password=${redis.listKeys().primaryKey},ssl=True,abortConnect=False' }

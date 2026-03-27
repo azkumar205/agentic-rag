@@ -36,6 +36,29 @@ def _add_chapter_dividers(html: str) -> str:
     )
 
 
+def _repair_mojibake(text: str) -> str:
+    """Repair common UTF-8 mojibake that was decoded through Windows-1252.
+
+    This preserves normal Unicode text and only applies the repair when the
+    content clearly contains broken sequences such as â or Ã.
+    """
+    if not any(marker in text for marker in ("â", "Ã", "ðŸ", "â†", "â‰")):
+        return text
+
+    raw = bytearray()
+    for char in text.lstrip("\ufeff"):
+        codepoint = ord(char)
+        if codepoint <= 255:
+            raw.append(codepoint)
+        else:
+            raw.extend(char.encode("cp1252"))
+
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return text
+
+
 # ──────────────────────────────────────────────
 # HTML shell
 # ──────────────────────────────────────────────
@@ -403,6 +426,7 @@ blockquote:has(strong:first-child) {{
 
 def convert_file(source: Path, output: Path, title: str) -> None:
     text = source.read_text(encoding="utf-8")
+    text = _repair_mojibake(text)
 
     converter = markdown.Markdown(
         extensions=[

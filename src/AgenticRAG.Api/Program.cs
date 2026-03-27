@@ -76,8 +76,13 @@ var cacheSearchClient = new SearchClient(
     "semantic-cache",
     credential);
 
-var embeddingClient = openAiClient.GetEmbeddingClient(openAiSettings.EmbeddingDeployment);
-builder.Services.AddSingleton(embeddingClient);
+// ── Dual Embedding Clients (Multi-Embedding Cost Optimization) ──
+// Document search uses text-embedding-3-large (1536d) — high quality, same model as ingestion
+// Semantic cache uses text-embedding-3-small (512d) — cheaper, question-to-question only
+var docEmbeddingClient = openAiClient.GetEmbeddingClient(openAiSettings.EmbeddingDeployment);
+builder.Services.AddSingleton(docEmbeddingClient);  // Used by DocumentSearchTool via MCP
+
+var cacheEmbeddingClient = openAiClient.GetEmbeddingClient(openAiSettings.CacheEmbeddingDeployment);
 
 var blobServiceClient = new BlobServiceClient(
     new Uri($"https://{blobSettings.AccountName}.blob.core.windows.net"), credential);
@@ -101,23 +106,26 @@ builder.Services.AddSingleton<WebSearchTool>();
 // Replaces both direct tool calls AND the old McpWebSearchProxyTool.
 builder.Services.AddSingleton<McpToolProxyService>();
 
-// ──────────── AI Chat Client with Auto Tool Invocation ────────────
-// This is the key "agentic" wiring:
-// 1. Get the raw GPT-4o ChatClient from Azure OpenAI
-// 2. Wrap it with UseFunctionInvocation() middleware
-// 3. When GPT-4o generates a tool_call, the middleware automatically
-//    executes the matching AIFunction (from McpToolProxyService) and
-//    feeds the result back to GPT-4o for further reasoning.
-// 4. Each AIFunction routes through MCP to the /mcp endpoint — no direct calls.
-builder.Services.AddSingleton<IChatClient>(sp =>
-{
-    var innerClient = openAiClient.GetChatClient(openAiSettings.ChatDeployment)
-        .AsIChatClient();
+// ──────────── AI Chat Clients — Multi-Model Cost Optimization ────────────
+// Two chat clients for different roles:
+//   PLANNING (GPT-4o-mini): Tool selection, function calling, reflection, summarization
+//     — 15x cheaper than GPT-4o, matches accuracy on classification/tool-calling tasks
+//   GENERATION (GPT-4o): Complex multi-source synthesis when router decides "complex"
+//     — Full quality preserved for analytical, comparative, multi-document answers
 
-    return new ChatClientBuilder(innerClient)
-        .UseFunctionInvocation()
-        .Build();
-});
+// Planning client — GPT-4o-mini with FunctionInvocation middleware (handles tool calls)
+var planningChatClient = new ChatClientBuilder(
+    openAiClient.GetChatClient(openAiSettings.PlanningDeployment).AsIChatClient())
+    .UseFunctionInvocation()
+    .Build();
+
+// Generation client — GPT-4o for complex answers (no function invocation needed)
+var generationChatClient = openAiClient
+    .GetChatClient(openAiSettings.ChatDeployment)
+    .AsIChatClient();
+
+builder.Services.AddKeyedSingleton<IChatClient>("planning", (_, _) => planningChatClient);
+builder.Services.AddKeyedSingleton<IChatClient>("generation", (_, _) => generationChatClient);
 
 // ── No ChatOptions singleton needed ──
 // The orchestrator now builds ChatOptions internally using McpToolProxyService
@@ -125,15 +133,24 @@ builder.Services.AddSingleton<IChatClient>(sp =>
 // See AgentOrchestrator.BuildMcpChatOptions() for the tool registration.
 
 // ──────────── Services ────────────
-// ReflectionService gets its own plain chat client (no tools) — it only evaluates answers
+// ReflectionService uses planning client (GPT-4o-mini) — scoring is a classification task
 builder.Services.AddSingleton<ReflectionService>(sp =>
-    new ReflectionService(
-        openAiClient.GetChatClient(openAiSettings.ChatDeployment).AsIChatClient()));
+    new ReflectionService(planningChatClient));
 
+// SemanticCacheService uses the SMALL embedding client (text-embedding-3-small, 512d)
+// Different model from document search is safe here — cache index is independent
 builder.Services.AddSingleton<SemanticCacheService>(sp =>
-    new SemanticCacheService(cacheSearchClient, openAiClient, openAiSettings, agentSettings));
+    new SemanticCacheService(cacheSearchClient, cacheEmbeddingClient,
+        openAiSettings.CacheEmbeddingDimensions, agentSettings));
 
-builder.Services.AddSingleton<ConversationMemoryService>();
+// ConversationMemoryService uses planning client (GPT-4o-mini) for summarization
+builder.Services.AddSingleton<ConversationMemoryService>(sp =>
+    new ConversationMemoryService(
+        sp.GetRequiredService<IConnectionMultiplexer>(),
+        planningChatClient,
+        agentSettings));
+
+builder.Services.AddSingleton<ComplexityRouterService>();
 builder.Services.AddSingleton<AgentOrchestrator>();
 
 // ──────────── MCP Server ────────────

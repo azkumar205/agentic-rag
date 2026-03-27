@@ -21,6 +21,7 @@
 | **Phase 6: Interview** | 30 Agentic RAG interview Q&A | Ch 20 |
 | **Phase 7: Advanced** | MCP Server integration for tool standardization | Ch 21 |
 | **Phase 8: Real-World** | Pain points, prompt eval, cost, market trends, mistakes | Ch 22 |
+| **Phase 9: Cost Optimization** | Multi-model routing, dual embedding, complexity-based generation | Ch 23 |
 
 **Every chapter ends with a working, testable piece.** By the end, you have a complete Agentic RAG system that:
 - Searches documents (PDFs/images) AND queries SQL Server
@@ -97,6 +98,9 @@
 
 ### Phase 8: Real-World Mastery
 - [22. Real-World Pain Points, Evaluation & Market Trends](#22-real-world-pain-points-evaluation--market-trends)
+
+### Phase 9: Cost Optimization
+- [23. Multi-Model & Multi-Embedding Cost Optimization](#23-multi-model--multi-embedding-cost-optimization)
 
 ---
 
@@ -1571,7 +1575,7 @@ You need everything from the Managed Path **plus** SQL Server and Redis:
 |---|----------|---------|-----|-------------|
 | 1 | Resource Group | Container | — | $0 |
 | 2 | Azure AI Search | Document index + cache index | Basic | ~$75 |
-| 3 | Azure OpenAI | GPT-4o + text-embedding-3-large | Standard S0 | ~$5-50 |
+| 3 | Azure OpenAI | GPT-4o, GPT-4o-mini, embedding-3-large, embedding-3-small | Standard S0 | ~$5-50 |
 | 4 | Azure Blob Storage | PDFs + extracted images | Standard LRS | ~$2 |
 | 5 | Document Intelligence | PDF/image extraction | F0 (free) | $0 |
 | 6 | **Azure SQL Database** | Structured business data | Basic (5 DTU) | ~$5 |
@@ -1619,12 +1623,34 @@ az cognitiveservices account deployment create `
   --sku-name Standard `
   --sku-capacity 30
 
-# Deploy embedding model
+# Deploy embedding model (document search — 1536d)
 az cognitiveservices account deployment create `
   --name "openai-$SUFFIX" `
   --resource-group $RG `
   --deployment-name text-embedding-3-large `
   --model-name text-embedding-3-large `
+  --model-version "1" `
+  --model-format OpenAI `
+  --sku-name Standard `
+  --sku-capacity 120
+
+# Deploy GPT-4o-mini (planning, reflection, summarization — 15x cheaper)
+az cognitiveservices account deployment create `
+  --name "openai-$SUFFIX" `
+  --resource-group $RG `
+  --deployment-name gpt-4o-mini `
+  --model-name gpt-4o-mini `
+  --model-version "2024-07-18" `
+  --model-format OpenAI `
+  --sku-name Standard `
+  --sku-capacity 30
+
+# Deploy small embedding model (semantic cache only — 6.5x cheaper)
+az cognitiveservices account deployment create `
+  --name "openai-$SUFFIX" `
+  --resource-group $RG `
+  --deployment-name text-embedding-3-small `
+  --model-name text-embedding-3-small `
   --model-version "1" `
   --model-format OpenAI `
   --sku-name Standard `
@@ -1749,7 +1775,7 @@ cd "e:\Agentic RAG"
 .\infra\deploy.ps1 -Suffix "agentic01" -Location "centralindia" -SqlPassword "YourStr0ngP@ss1!"
 ```
 
-**What happens**: Creates Resource Group → deploys `infra/main.bicep` → provisions AI Search, OpenAI (GPT-4o + embedding), Storage, Document Intelligence, SQL Server + DB, Redis, Key Vault, App Service, Application Insights — all in one deployment.
+**What happens**: Creates Resource Group → deploys `infra/main.bicep` → provisions AI Search, OpenAI (GPT-4o, GPT-4o-mini, text-embedding-3-large, text-embedding-3-small), Storage, Document Intelligence, SQL Server + DB, Redis, Key Vault, App Service, Application Insights — all in one deployment.
 
 **Expected output** (after 5-10 minutes):
 ```
@@ -4909,6 +4935,511 @@ To hit exactly $1,000, batch non-urgent analytics queries using the Batch API (5
 │                                                                    │
 │  COST: ~$0.03-$0.10/query | ~$115-160/month infrastructure        │
 └──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# Phase 9: Cost Optimization
+
+---
+
+## 23. Multi-Model & Multi-Embedding Cost Optimization
+
+> **Interview Note**: This is the #1 production concern for enterprise RAG systems. Every senior architect interview will ask "How do you optimize costs at scale?" This chapter gives you the market-standard answer with working code.
+
+### 23.1 The Problem: One Model Fits All = Overpaying
+
+Our current architecture uses **GPT-4o for everything** — planning, generation, reflection, and summarization. It also uses **text-embedding-3-large** for both document search and semantic cache. This is like using a Ferrari for grocery runs.
+
+```
+CURRENT (Single Model — Expensive):
+
+User Question
+  → text-embedding-3-large (1536d)  → Cache lookup     ← expensive embedding
+  → GPT-4o                          → Planning + tools  ← expensive planning
+  → GPT-4o                          → Generation        ← expensive generation
+  → GPT-4o                          → Reflection score  ← expensive evaluation
+  → GPT-4o                          → Memory summary    ← expensive summarization
+```
+
+**Per-query cost: ~$0.02 ($609/month at 1,000 queries/day)**
+
+### 23.2 Industry-Standard Cost Optimization Approaches (Ranked by Adoption)
+
+| # | Approach | Industry Adoption | Description | Our Implementation |
+|---|----------|------------------|-------------|-------------------|
+| 1 | **Semantic Caching** | Very Common | Skip LLM entirely on repeat/similar questions | ✅ Already built (Ch 15) |
+| 2 | **Smaller model for classification/reflection** | Very Common | Use GPT-4o-mini for tasks that don't need GPT-4o quality | ✅ Adding in this chapter |
+| 3 | **Multi-model routing** | Common | Route simple queries to cheap model, complex to expensive | ✅ Adding in this chapter |
+| 4 | **Dual embedding strategy** | Common | Different embedding models for different indexes | ✅ Adding in this chapter |
+| 5 | **Prompt compression** | Common | Reduce input tokens by trimming context | ❌ Not covered (future) |
+| 6 | **Response streaming** | Common | Perceived latency improvement (not cost reduction) | ❌ Not covered |
+| 7 | **Local LLM (Ollama)** | Rare in production | Free inference but unreliable at scale | ❌ Not recommended — see 23.9 |
+
+### 23.3 The Market-Standard Architecture
+
+```
+OPTIMIZED (Multi-Model — 65% cheaper):
+
+User Question
+  → text-embedding-3-small (512d)   → Cache lookup     ← 6.5x cheaper embedding
+  → text-embedding-3-large (1536d)  → Document search   ← full quality (one-time cost at ingestion)
+  → GPT-4o-mini                     → Planning + tools  ← 15x cheaper planning
+  → ComplexityRouter                → Simple or Complex?
+      → Simple: GPT-4o-mini         → Generation        ← 15x cheaper for ~60% of queries
+      → Complex: GPT-4o             → Generation        ← full quality when needed
+  → GPT-4o-mini                     → Reflection score  ← 15x cheaper evaluation
+  → GPT-4o-mini                     → Memory summary    ← 15x cheaper summarization
+```
+
+**Per-query cost: ~$0.006 ($186/month at 1,000 queries/day) — 69% reduction**
+
+### 23.4 Why Two Embedding Models? (Interview Question)
+
+> **Q: Can you use a small embedding model for queries and a large one for documents?**
+>
+> **A: Not for the same index.** Azure AI Search computes cosine similarity between the query vector and document vectors. If they come from different models, the vectors are in different semantic spaces — similarity scores become meaningless.
+>
+> **But you CAN use different models for different indexes.** Our semantic cache (`semantic-cache` index) only compares question→question. The document index (`agentic-rag-index`) compares question→document chunk. These are independent.
+
+```
+Document Index (agentic-rag-index):
+  Ingestion:  text-embedding-3-large (1536d) → content_vector  ← SAME MODEL
+  Query:      text-embedding-3-large (1536d) → search vector    ← SAME MODEL ✅
+
+Semantic Cache (semantic-cache):
+  Write:      text-embedding-3-small (512d) → question_vector   ← SAME MODEL
+  Lookup:     text-embedding-3-small (512d) → search vector     ← SAME MODEL ✅
+
+CROSS-INDEX:  Different models are FINE because these indexes NEVER interact.
+```
+
+**Key implementation detail**: This requires **two separate EmbeddingClient instances** — one per model. The current codebase shares a single `EmbeddingClient` across both services.
+
+### 23.5 Why GPT-4o-mini for Planning? (Interview Question)
+
+> **Q: Won't a cheaper model make worse tool-selection decisions?**
+>
+> **A: No.** GPT-4o-mini is specifically trained for tool calling and classification tasks. OpenAI's benchmarks show it matches GPT-4o on function calling accuracy within 1-2%. Planning is a classification problem — "which tools does this question need?" — not a creative generation task. The quality difference matters for the final answer synthesis, not for deciding whether to call `SearchDocumentsAsync` or `QuerySqlAsync`.
+
+| Task | GPT-4o Quality | GPT-4o-mini Quality | Difference |
+|------|---------------|---------------------|------------|
+| Tool selection / Function calling | 95% | 93% | Negligible |
+| Reflection scoring (1-10) | Accurate | Accurate | Same criteria evaluation |
+| Memory summarization | Excellent | Good | Acceptable for context compression |
+| Complex multi-doc synthesis | Excellent | Weak | **Use GPT-4o here** |
+| SQL explanation + analysis | Excellent | Moderate | **Use GPT-4o here** |
+
+### 23.6 Complexity Router — How to Decide Simple vs Complex
+
+The router classifies each query AFTER the planning phase completes (tools have been called, results are available).
+
+```
+ROUTING RULES (rule-based, no extra LLM cost):
+
+Simple → GPT-4o-mini:
+  • 0-1 tools called (single-source answer)
+  • Total context < 2000 tokens
+  • Question starts with: "what is", "define", "list", "show me"
+  • Tool results contain a direct, complete answer
+
+Complex → GPT-4o:
+  • 2+ tools called (multi-source synthesis needed)
+  • Total context > 2000 tokens
+  • Question requires: comparison, analysis, trend, "why", "how does X affect Y"
+  • Previous attempt scored < 6 on reflection (escalation)
+```
+
+**Examples**:
+
+| Question | Tools Called | Route | Why |
+|----------|------------|-------|-----|
+| "What is our refund policy?" | 1 (search_documents) | **GPT-4o-mini** | Single doc, factual lookup |
+| "Show vendor billing for Q1" | 1 (query_sql) | **GPT-4o-mini** | Single source, data table |
+| "Compare contract terms with billing patterns" | 2 (search + sql) | **GPT-4o** | Multi-source synthesis |
+| "Why did vendor costs increase?" | 2 (search + sql) | **GPT-4o** | Analysis + reasoning |
+| "What is the architecture diagram?" | 1 (get_images) | **GPT-4o-mini** | Simple retrieval |
+
+### 23.7 Cost Comparison: Before vs After
+
+#### Per-Query Breakdown
+
+| Stage | Before (All GPT-4o) | After (Multi-Model) | Savings |
+|-------|---------------------|---------------------|---------|
+| Cache embedding | 100 tok × $0.13/1M = $0.000013 | 100 tok × $0.02/1M = $0.000002 | 85% |
+| Doc search embedding | 100 tok × $0.13/1M = $0.000013 | 100 tok × $0.13/1M = $0.000013 | 0% (keep large) |
+| Planning + tool calls | 3K×$2.50 + 600×$10 = $0.01350 | 3K×$0.15 + 600×$0.60 = $0.00081 | 94% |
+| Generation (simple 60%) | included above | GPT-4o-mini = $0.00081 | 94% |
+| Generation (complex 40%) | included above | GPT-4o = $0.00500 | 0% |
+| Reflection | 2K×$2.50 + 100×$10 = $0.00600 | 2K×$0.15 + 100×$0.60 = $0.00036 | 94% |
+| Memory summary (amortized) | $0.00080 | $0.00005 | 94% |
+| **Per-query average** | **$0.0203** | **$0.0062** | **69%** |
+
+#### Monthly Cost at Scale
+
+| Volume | Before | After | Monthly Savings |
+|--------|--------|-------|-----------------|
+| 100 queries/day | $61 | $19 | $42 |
+| 1,000 queries/day | $609 | $186 | $423 |
+| 5,000 queries/day | $3,045 | $930 | $2,115 |
+| 10,000 queries/day | $6,090 | $1,860 | $4,230 |
+
+### 23.8 Implementation — Code Changes
+
+#### Step 0: Deploy New Models (Bicep / Azure CLI)
+
+Before any code changes, deploy the two new models on your Azure OpenAI resource. The `infra/main.bicep` template now includes all four deployments:
+
+```bicep
+// infra/main.bicep — New deployments (added after existing gpt-4o + text-embedding-3-large)
+
+// Cost Optimization: GPT-4o-mini (planning, reflection, summarization)
+resource gpt4oMiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+  parent: openAI
+  name: 'gpt-4o-mini'
+  sku: { name: 'Standard', capacity: 30 }
+  properties: {
+    model: { format: 'OpenAI', name: 'gpt-4o-mini', version: '2024-07-18' }
+  }
+  dependsOn: [embeddingDeployment]
+}
+
+// Cost Optimization: text-embedding-3-small (semantic cache only)
+resource cacheEmbeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+  parent: openAI
+  name: 'text-embedding-3-small'
+  sku: { name: 'Standard', capacity: 120 }
+  properties: {
+    model: { format: 'OpenAI', name: 'text-embedding-3-small', version: '1' }
+  }
+  dependsOn: [gpt4oMiniDeployment]
+}
+```
+
+Or deploy manually via Azure CLI:
+
+```powershell
+# Deploy GPT-4o-mini
+az cognitiveservices account deployment create `
+  --name "openai-agentic01" --resource-group rg-agentic-rag `
+  --deployment-name gpt-4o-mini --model-name gpt-4o-mini `
+  --model-version "2024-07-18" --model-format OpenAI `
+  --sku-name Standard --sku-capacity 30
+
+# Deploy text-embedding-3-small
+az cognitiveservices account deployment create `
+  --name "openai-agentic01" --resource-group rg-agentic-rag `
+  --deployment-name text-embedding-3-small --model-name text-embedding-3-small `
+  --model-version "1" --model-format OpenAI `
+  --sku-name Standard --sku-capacity 120
+```
+
+The App Service app settings in Bicep are also updated with the new deployment names:
+
+```bicep
+// App settings added to webApp siteConfig:
+{ name: 'AzureOpenAI__PlanningDeployment', value: 'gpt-4o-mini' }
+{ name: 'AzureOpenAI__CacheEmbeddingDeployment', value: 'text-embedding-3-small' }
+{ name: 'AzureOpenAI__CacheEmbeddingDimensions', value: '512' }
+```
+
+> **Verify**: Go to Azure Portal → OpenAI resource → Model deployments. You should see 4 deployments: `gpt-4o`, `gpt-4o-mini`, `text-embedding-3-large`, `text-embedding-3-small`.
+
+#### Step 1: Configuration (AgenticRagSettings.cs)
+
+Add new settings for multi-model support:
+
+```csharp
+// In AgenticRagSettings.cs — add to AzureOpenAISettings:
+
+public class AzureOpenAISettings
+{
+    public string Endpoint { get; set; } = "";
+    public string ChatDeployment { get; set; } = "gpt-4o";               // Complex generation
+    public string PlanningDeployment { get; set; } = "gpt-4o-mini";      // Planning + reflection + summary
+    public string EmbeddingDeployment { get; set; } = "text-embedding-3-large";  // Document search
+    public int EmbeddingDimensions { get; set; } = 1536;                 // Document index dimensions
+    public string CacheEmbeddingDeployment { get; set; } = "text-embedding-3-small"; // Cache lookup
+    public int CacheEmbeddingDimensions { get; set; } = 512;            // Cache index dimensions
+}
+```
+
+#### Step 2: Configuration (appsettings.json)
+
+```json
+{
+  "AzureOpenAI": {
+    "Endpoint": "https://openai-agentic01.openai.azure.com/",
+    "ChatDeployment": "gpt-4o",
+    "PlanningDeployment": "gpt-4o-mini",
+    "EmbeddingDeployment": "text-embedding-3-large",
+    "EmbeddingDimensions": 1536,
+    "CacheEmbeddingDeployment": "text-embedding-3-small",
+    "CacheEmbeddingDimensions": 512
+  }
+}
+```
+
+#### Step 3: Dual Embedding Clients (Program.cs)
+
+```csharp
+// TWO embedding clients — one per model
+
+// Document search embedding (text-embedding-3-large, 1536d)
+var docEmbeddingClient = openAiClient.GetEmbeddingClient(openAiSettings.EmbeddingDeployment);
+builder.Services.AddSingleton(docEmbeddingClient);  // Used by DocumentSearchTool
+
+// Cache embedding (text-embedding-3-small, 512d) — registered as keyed service
+var cacheEmbeddingClient = openAiClient.GetEmbeddingClient(openAiSettings.CacheEmbeddingDeployment);
+
+// SemanticCacheService gets the SMALL embedding client
+builder.Services.AddSingleton<SemanticCacheService>(sp =>
+    new SemanticCacheService(cacheSearchClient, cacheEmbeddingClient,
+        openAiSettings.CacheEmbeddingDimensions, agentSettings));
+```
+
+#### Step 4: Dual Chat Clients (Program.cs)
+
+```csharp
+// PLANNING client — GPT-4o-mini with function invocation (tool calling)
+var planningChatClient = new ChatClientBuilder(
+    openAiClient.GetChatClient(openAiSettings.PlanningDeployment).AsIChatClient())
+    .UseFunctionInvocation()
+    .Build();
+
+// GENERATION client — GPT-4o for complex answers (no function invocation needed)
+var generationChatClient = openAiClient
+    .GetChatClient(openAiSettings.ChatDeployment)
+    .AsIChatClient();
+
+// Register both
+builder.Services.AddKeyedSingleton<IChatClient>("planning", (_, _) => planningChatClient);
+builder.Services.AddKeyedSingleton<IChatClient>("generation", (_, _) => generationChatClient);
+
+// Reflection uses planning client (GPT-4o-mini — scoring doesn't need GPT-4o)
+builder.Services.AddSingleton<ReflectionService>(sp =>
+    new ReflectionService(planningChatClient));
+
+// Memory uses planning client (GPT-4o-mini — summarization doesn't need GPT-4o)
+builder.Services.AddSingleton<ConversationMemoryService>(sp =>
+    new ConversationMemoryService(
+        sp.GetRequiredService<IConnectionMultiplexer>(),
+        planningChatClient,
+        agentSettings));
+```
+
+#### Step 5: Complexity Router (New File)
+
+```csharp
+// src/AgenticRAG.Core/Agents/ComplexityRouterService.cs
+
+namespace AgenticRAG.Core.Agents;
+
+public enum QueryComplexity { Simple, Complex }
+
+public class ComplexityRouterService
+{
+    private static readonly string[] SimplePatterns =
+        { "what is", "define", "list", "show me", "get", "how many" };
+
+    private static readonly string[] ComplexPatterns =
+        { "compare", "analyze", "why", "how does", "trend", "affect",
+          "relationship", "correlat", "versus", "difference between" };
+
+    public QueryComplexity Classify(string question, List<string> toolsUsed, int contextTokens)
+    {
+        var q = question.ToLowerInvariant();
+
+        // Rule 1: Multiple tools = complex (multi-source synthesis)
+        if (toolsUsed.Distinct().Count() >= 2)
+            return QueryComplexity.Complex;
+
+        // Rule 2: Large context = complex (lots of data to synthesize)
+        if (contextTokens > 2000)
+            return QueryComplexity.Complex;
+
+        // Rule 3: Complex question patterns
+        if (ComplexPatterns.Any(p => q.Contains(p)))
+            return QueryComplexity.Complex;
+
+        // Rule 4: Simple question patterns
+        if (SimplePatterns.Any(p => q.StartsWith(p)))
+            return QueryComplexity.Simple;
+
+        // Default: simple (majority of enterprise queries are lookups)
+        return QueryComplexity.Simple;
+    }
+}
+```
+
+#### Step 6: Refactored AgentOrchestrator (Key Changes)
+
+```csharp
+// Constructor now takes TWO chat clients + router
+
+public AgentOrchestrator(
+    [FromKeyedServices("planning")] IChatClient planningClient,   // GPT-4o-mini
+    [FromKeyedServices("generation")] IChatClient generationClient, // GPT-4o
+    ComplexityRouterService complexityRouter,
+    McpToolProxyService mcpProxy,
+    ConversationMemoryService memoryService,
+    SemanticCacheService cacheService,
+    ReflectionService reflectionService,
+    AgentSettings settings,
+    ILogger<AgentOrchestrator> logger)
+
+// ProcessAsync changes:
+
+// Step 5A: PLANNING phase (GPT-4o-mini — cheap, accurate for tool selection)
+var planningResponse = await _planningClient.GetResponseAsync(messages, chatOptions);
+ExtractToolCalls(planningResponse.Messages, toolsUsed, reasoningSteps);
+
+// Step 5B: ROUTING — decide which generation model to use
+var complexity = _complexityRouter.Classify(
+    request.Question, toolsUsed, EstimateTokens(planningResponse));
+
+// Step 5C: GENERATION phase — route to appropriate model
+string answer;
+if (complexity == QueryComplexity.Simple)
+{
+    // Simple: GPT-4o-mini generates directly from planning results
+    answer = planningResponse.Text ?? "Unable to generate response.";
+    modelUsed = "gpt-4o-mini";
+}
+else
+{
+    // Complex: GPT-4o synthesizes a better answer from tool results
+    var genMessages = BuildGenerationPrompt(request.Question, planningResponse);
+    var genResponse = await _generationClient.GetResponseAsync(genMessages);
+    answer = genResponse.Text ?? planningResponse.Text ?? "Unable to generate response.";
+    modelUsed = "gpt-4o";
+}
+```
+
+#### Step 7: Updated SemanticCacheService
+
+```csharp
+// Constructor now accepts embedding client + dimensions directly (not AzureOpenAISettings)
+
+public SemanticCacheService(
+    SearchClient cacheClient,
+    EmbeddingClient cacheEmbeddingClient,  // text-embedding-3-small
+    int cacheEmbeddingDimensions,          // 512
+    AgentSettings agentSettings)
+{
+    _cacheClient = cacheClient;
+    _embeddingClient = cacheEmbeddingClient;   // Small model for cache
+    _settings = agentSettings;
+    _dimensions = cacheEmbeddingDimensions;    // 512
+}
+```
+
+### 23.9 Why NOT Ollama in Production (Interview Answer)
+
+> **Q: Why not use a local LLM like Ollama for simple queries — it's free?**
+>
+> **A: Four reasons make it non-standard for production:**
+> 1. **Reliability** — if the local process crashes, your API degrades. Needs health checks, circuit breakers, restart logic.
+> 2. **Scalability** — Ollama handles one request at a time under load. Azure OpenAI scales horizontally.
+> 3. **Deployment complexity** — your container now needs GPU/beefy CPU, sidecar process management, model weight storage.
+> 4. **Cost math doesn't work** — GPT-4o-mini at $0.15/1M input tokens is already so cheap that the operational overhead of running Ollama exceeds the savings for most enterprise workloads.
+>
+> **What companies actually do**: Use GPT-4o-mini for everything except complex generation. Simple, reliable, same 60-70% savings without operational risk.
+
+### 23.10 Interview Answer — Complete Cost Optimization Strategy
+
+> **Q: How would you optimize costs in your Agentic RAG system?**
+>
+> "I implemented a multi-model, multi-embedding strategy based on industry-standard patterns:
+>
+> **Embeddings**: I use `text-embedding-3-large` (1536d) for document ingestion and search — this is a one-time cost and keeps search quality high. For the semantic cache, I use `text-embedding-3-small` (512d) because it's an independent index that only compares question-to-question — different semantic space is fine since the two indexes never interact.
+>
+> **LLM Tiers**: Planning and tool selection use GPT-4o-mini — it matches GPT-4o on function-calling accuracy within 2%. Reflection scoring and memory summarization also use GPT-4o-mini since they're classification/compression tasks. Only complex multi-source synthesis (comparing documents with SQL data, trend analysis) routes to GPT-4o.
+>
+> **Routing**: A rule-based complexity router checks tool count, context size, and question patterns after the planning phase. No extra LLM call needed for routing — it's pure heuristics.
+>
+> **Results**: 69% per-query cost reduction. At 1,000 queries/day, that's $423/month savings with no measurable quality loss on simple queries and full GPT-4o quality preserved for complex ones."
+
+### 23.11 Implementation Checklist
+
+```
+□ Update infra/main.bicep with gpt-4o-mini + text-embedding-3-small deployments
+□ Update infra/main.bicep App Service settings (PlanningDeployment, CacheEmbedding*)
+□ Update infra/deploy.ps1 to include CacheEmbedding settings in generated config
+□ Run: az deployment group create (or deploy.ps1) to deploy new models
+□ Verify 4 model deployments in Azure Portal
+□ Update appsettings.json with PlanningDeployment + CacheEmbeddingDeployment
+□ Update AgenticRagSettings.cs with new properties
+□ Register dual embedding clients in Program.cs
+□ Register keyed chat clients (planning + generation) in Program.cs
+□ Create ComplexityRouterService.cs
+□ Refactor AgentOrchestrator for two-phase LLM calls
+□ Refactor SemanticCacheService to accept small embedding client
+□ Refactor ReflectionService to use planning client
+□ Refactor ConversationMemoryService to use planning client
+□ Re-create semantic-cache index with 512d vectors (run Setup)
+□ Test: simple query → routes to GPT-4o-mini
+□ Test: complex query → routes to GPT-4o
+□ Monitor Azure OpenAI usage dashboard — GPT-4o consumption drops ~70%
+```
+
+### 23.12 Architecture Diagram — Final Optimized System
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    COST-OPTIMIZED AGENTIC RAG                           │
+│                                                                         │
+│  User Question                                                          │
+│       │                                                                 │
+│       ▼                                                                 │
+│  ┌─────────────────┐    text-embedding-3-small (512d)                   │
+│  │ Semantic Cache   │◄─── Cache-only embedding (6.5x cheaper)           │
+│  │ (semantic-cache) │                                                   │
+│  └────────┬────────┘                                                    │
+│           │ MISS                                                        │
+│           ▼                                                             │
+│  ┌─────────────────┐                                                    │
+│  │ Load Memory     │◄─── Redis (no LLM cost)                           │
+│  │ (Redis)         │                                                    │
+│  └────────┬────────┘                                                    │
+│           ▼                                                             │
+│  ┌─────────────────┐    GPT-4o-mini ($0.15/1M input)                    │
+│  │ PLANNING PHASE  │◄─── Tool selection + function calling              │
+│  │ (GPT-4o-mini)   │     15x cheaper than GPT-4o                        │
+│  └────────┬────────┘                                                    │
+│           │                                                             │
+│     ┌─────┴──────┐                                                      │
+│     ▼            ▼                                                      │
+│  ┌──────┐  ┌──────────┐   text-embedding-3-large (1536d)                │
+│  │ MCP  │  │ Doc Search│◄── Full-quality embedding (same as ingestion)  │
+│  │Tools │  │ (AI Search)│                                               │
+│  └──┬───┘  └──────────┘                                                 │
+│     │                                                                   │
+│     ▼                                                                   │
+│  ┌─────────────────┐    Rule-based (no LLM cost)                        │
+│  │ComplexityRouter  │◄─── Check: tools used, context size, patterns     │
+│  └────────┬────────┘                                                    │
+│       ┌───┴───┐                                                         │
+│       ▼       ▼                                                         │
+│  ┌────────┐ ┌────────┐                                                  │
+│  │ SIMPLE │ │COMPLEX │                                                  │
+│  │GPT-4o- │ │ GPT-4o │◄─── Full quality for multi-source synthesis      │
+│  │ mini   │ │        │                                                  │
+│  └────┬───┘ └───┬────┘                                                  │
+│       └────┬────┘                                                       │
+│            ▼                                                            │
+│  ┌─────────────────┐    GPT-4o-mini                                     │
+│  │ REFLECTION      │◄─── Quality scoring (classification task)          │
+│  │ (GPT-4o-mini)   │                                                    │
+│  └────────┬────────┘                                                    │
+│           ▼                                                             │
+│  ┌─────────────────┐                                                    │
+│  │ Cache Write +   │◄─── Store good answers for next cache hit          │
+│  │ Memory Save     │                                                    │
+│  └─────────────────┘                                                    │
+│                                                                         │
+│  TOTAL SAVINGS: ~69% per query | ~$423/month at 1K queries/day          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
