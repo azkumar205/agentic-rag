@@ -1,0 +1,25 @@
+[
+  {
+    "question": "What is the contract termination notice period?",
+    "expected_answer": "90 days written notice",
+    "relevant_chunks": [
+      "Section 12.1: Either party may terminate with 90 days written notice.",
+      "Section 12.2: Notice must be delivered to the registered address."
+    ]
+  },
+  {
+    "question": "List all invoice numbers for 2025.",
+    "expected_answer": "Invoice numbers for 2025",
+    "relevant_chunks": [
+      "Invoice #2025-001: $1,200 paid.",
+      "Invoice #2025-002: $2,400 pending."
+    ]
+  },
+  {
+    "question": "Who are the parties to the agreement?",
+    "expected_answer": "Company A and Company B",
+    "relevant_chunks": [
+      "Section 1.1: This agreement is between Company A and Company B."
+    ]
+  }
+]

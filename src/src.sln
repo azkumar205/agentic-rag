@@ -8,6 +8,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgenticRAG.Core", "AgenticR
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgenticRAG.Setup", "AgenticRAG.Setup\AgenticRAG.Setup.csproj", "{5FB54E7E-9715-918C-A876-8E1067EBB4A4}"
 EndProject
+
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +27,7 @@ Global
 		{5FB54E7E-9715-918C-A876-8E1067EBB4A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5FB54E7E-9715-918C-A876-8E1067EBB4A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5FB54E7E-9715-918C-A876-8E1067EBB4A4}.Release|Any CPU.Build.0 = Release|Any CPU
+
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
