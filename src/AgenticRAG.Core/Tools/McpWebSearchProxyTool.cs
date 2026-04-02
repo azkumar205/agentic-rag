@@ -1,3 +1,21 @@
+// =====================================================================================
+// McpWebSearchProxyTool — LEGACY: Single-tool MCP proxy for web search only
+// =====================================================================================
+//
+// WHAT IS THIS?
+// This was the ORIGINAL MCP proxy that only handled web search. It has been
+// SUPERSEDED by McpToolProxyService which handles ALL 5 tools through MCP.
+//
+// WHY DOES IT STILL EXIST?
+// It's kept for backward compatibility — some deployments may still reference it.
+// For new code, use McpToolProxyService.SearchWebAsync() instead.
+//
+// HOW IT WORKS: Same pattern as McpToolProxyService — creates an MCP client,
+// calls the "search_web" tool, parses the response.
+//
+// INTERVIEW TIP: "We started with a single MCP proxy for web search, then
+// refactored to a unified proxy (McpToolProxyService) when we added more MCP tools."
+// =====================================================================================
 using System.ComponentModel;
 using System.Text;
 using AgenticRAG.Core.Configuration;
@@ -17,6 +35,7 @@ public class McpWebSearchProxyTool
         _settings = settings;
     }
 
+    // Same pattern as McpToolProxyService but only for web search
     [Description("Search the public internet via MCP tool endpoint. " +
                  "This routes web search through MCP while other internal tools can remain direct.")]
     public async Task<string> SearchWebViaMcpAsync(
@@ -33,6 +52,7 @@ public class McpWebSearchProxyTool
 
         try
         {
+            // Create MCP HTTP transport (AutoDetect: Streamable HTTP → SSE fallback)
             var transport = new HttpClientTransport(
                 new HttpClientTransportOptions
                 {
@@ -42,12 +62,14 @@ public class McpWebSearchProxyTool
                 _httpClient,
                 ownsHttpClient: false);
 
+            // Connect to MCP server
             await using var client = await McpClient.CreateAsync(
                 transport,
                 new McpClientOptions(),
                 loggerFactory: null,
                 cancellationToken: cancellationToken);
 
+            // Call the "search_web" tool via MCP protocol
             var args = new Dictionary<string, object?>
             {
                 ["query"] = query,
@@ -71,6 +93,7 @@ public class McpWebSearchProxyTool
                 return "[WebSource] MCP tool returned no content.";
             }
 
+            // Parse text content blocks into a single string
             var sb = new StringBuilder();
             foreach (var block in result.Content)
             {

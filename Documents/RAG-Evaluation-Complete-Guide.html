@@ -467,6 +467,36 @@ Judge Prompt:
 </div>
 
 <!-- ════════════════════════════════════════════════ -->
+    <h1 id="pii-handling">6A. PII Handling in RAG Evaluation</h1>
+
+    <p><strong>Why it matters:</strong> RAG systems often process sensitive data (names, emails, IDs, health info). Mishandling PII can lead to compliance violations, data leaks, and user mistrust. <strong>Evaluation pipelines must never leak or store real PII.</strong></p>
+
+    <h3>Best Practices for PII Handling</h3>
+    <ul>
+      <li><strong>Redact PII in logs and evaluation data:</strong> Before logging user questions, answers, or evaluation traces, use a PII redaction function to remove names, emails, phone numbers, SSNs, etc.</li>
+      <li><strong>Keep LLM/evaluation calls within secure boundaries:</strong> Use Azure OpenAI in the same region/tenant as your data. Never send PII to public endpoints or third-party LLMs.</li>
+      <li><strong>Access control for human review:</strong> Only authorized reviewers can access logs or feedback with PII. Enforce RBAC in your review dashboard.</li>
+      <li><strong>Automated PII detection:</strong> Use Azure Content Safety or regex to scan and redact PII before storing or displaying data.</li>
+      <li><strong>Golden test set hygiene:</strong> Never include real PII in your golden test set. Use synthetic or anonymized data for all test questions and answers.</li>
+    </ul>
+
+    <h3>Sample PII Handling Workflow</h3>
+    <ol>
+      <li>User submits a question (may contain PII)</li>
+      <li>Before logging or storing, run a PII redaction utility</li>
+      <li>Only send data to Azure OpenAI in-region (never public LLMs)</li>
+      <li>Store only redacted logs and evaluation traces</li>
+      <li>Golden test set is reviewed to ensure no real PII is present</li>
+    </ol>
+
+    <div class="callout">
+      <strong>Interview answer:</strong> "All evaluation logs and golden test sets are PII-scrubbed before storage. We use Azure OpenAI in-region, redact PII from logs and feedback, and restrict human review access via RBAC. No real PII is ever stored or sent outside our tenant."
+    </div>
+
+    <div class="interview">
+      <strong>Q: "How do you ensure PII is handled safely in RAG evaluation?"</strong><br />
+      <strong>A:</strong> "We run automated PII redaction on all logs and evaluation data, use only in-tenant Azure OpenAI, and never include real PII in our golden test set. Human review is RBAC-restricted."
+    </div>
 <h1 id="ragas">7. RAGAS — Deep Dive</h1>
 
 <p>In production, <strong>you don't write custom evaluation code</strong>. You use <strong>RAGAS</strong> (Retrieval-Augmented Generation Assessment) — the most popular open-source RAG eval framework. Every concept from sections 3-6 maps directly to a RAGAS metric. This section shows exactly how.</p>

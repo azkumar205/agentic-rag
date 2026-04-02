@@ -1,35 +1,44 @@
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ComplexityRouterService — Routes queries to cheap or expensive LLM.
+// =====================================================================================
+// ComplexityRouterService — DECIDES whether to use the CHEAP or EXPENSIVE LLM
+// =====================================================================================
 //
-// After the planning phase (GPT-4o-mini selects and calls tools), this
-// service decides whether the GENERATION step needs GPT-4o or can stay
-// on GPT-4o-mini. Rule-based — no extra LLM cost for the routing decision.
+// WHAT IS THIS?
+// After the planning phase (GPT-4o-mini picks and calls tools), we have tool results.
+// Now we need to GENERATE the final answer. This service decides:
+//   - Simple question? → Use GPT-4o-mini ($0.15/1M tokens) — cheap and fast
+//   - Complex question? → Use GPT-4o ($2.50/1M tokens) — smarter but 17x more expensive
 //
-// Routing logic:
-//   Simple → GPT-4o-mini:  0-1 tools, short context, factual lookups
-//   Complex → GPT-4o:      2+ tools, long context, analysis/comparison
+// HOW DOES IT DECIDE?
+// It uses 4 RULES (no LLM call needed, zero cost):
+//   Rule 1: If 2+ different tools were called → Complex (needs to synthesize multiple sources)
+//   Rule 2: If tool results are large (>2000 tokens) → Complex (lots of data to analyze)
+//   Rule 3: If question contains "compare", "analyze", "why" → Complex (reasoning needed)
+//   Rule 4: If question starts with "what is", "define", "list" → Simple (factual lookup)
 //
-// Why rule-based? At typical enterprise scale, a rule-based router saves
-// $0 in LLM routing costs while an LLM-based router adds ~$0.001/query.
-// Upgrade to LLM-based only if rule accuracy drops below 85%.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// WHY RULE-BASED INSTEAD OF LLM-BASED?
+// An LLM-based router would add ~$0.001 per query for the routing decision itself.
+// Rule-based costs $0. Upgrade to LLM-based only if rule accuracy drops below 85%.
+//
+// INTERVIEW TIP: "We use a complexity router to save costs — simple lookups go to the
+// cheap model, only complex analysis hits the expensive model. This can cut LLM costs by 60%."
+// =====================================================================================
 namespace AgenticRAG.Core.Agents;
 
+// Simple = use cheap model (GPT-4o-mini), Complex = use powerful model (GPT-4o)
 public enum QueryComplexity { Simple, Complex }
 
 public class ComplexityRouterService
 {
+    // Questions starting with these words are usually simple factual lookups
     private static readonly string[] SimplePatterns =
         ["what is", "define", "list", "show me", "get", "how many"];
 
+    // Questions containing these words usually need deeper reasoning
     private static readonly string[] ComplexPatterns =
         ["compare", "analyze", "why", "how does", "trend", "affect",
          "relationship", "correlat", "versus", "difference between"];
 
-    /// <summary>
-    /// Classifies a query as Simple or Complex based on tool usage, context size, and question patterns.
-    /// Called after planning phase — tools have already been selected and called.
-    /// </summary>
+    // Called AFTER tools have already run — we know what tools were used and how much data came back
     public QueryComplexity Classify(string question, List<string> toolsUsed, int contextTokenEstimate)
     {
         var q = question.ToLowerInvariant();
@@ -50,7 +59,7 @@ public class ComplexityRouterService
         if (SimplePatterns.Any(p => q.StartsWith(p)))
             return QueryComplexity.Simple;
 
-        // Default: simple (majority of enterprise queries are single-source lookups)
+        // Default: simple — most enterprise queries are single-source lookups
         return QueryComplexity.Simple;
     }
 }

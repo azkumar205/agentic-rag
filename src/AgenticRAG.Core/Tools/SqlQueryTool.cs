@@ -1,18 +1,25 @@
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SqlQueryTool — AI Tool for querying structured business data.
+// =====================================================================================
+// SqlQueryTool — AI TOOL: Queries live business data from SQL Server
+// =====================================================================================
 //
-// Unlike documents (pre-indexed), SQL data is queried live at runtime.
-// The agent writes SELECT queries against read-only views — never raw tables.
+// WHAT IS THIS?
+// Unlike documents (pre-indexed in Azure AI Search), SQL data is queried LIVE at runtime.
+// When the agent needs billing data, invoice details, or vendor analysis, GPT-4o writes
+// a SQL query and this tool executes it against read-only views.
 //
-// Security model (critical):
-//   • Only SELECT statements allowed (no INSERT/UPDATE/DELETE/DROP)
-//   • Queries must reference whitelisted views only (vw_BillingOverview, etc.)
-//   • Dangerous keywords blocked: EXEC, xp_, sp_, --, ;, /*
-//   • 10-second timeout, max 50 rows returned
+// SECURITY MODEL (Critical for interviews):
+//   1. SELECT ONLY — no INSERT, UPDATE, DELETE, DROP, ALTER, EXEC, or MERGE
+//   2. WHITELISTED VIEWS — agent can ONLY query pre-approved views, never raw tables
+//   3. BLOCKED KEYWORDS — xp_, sp_, --, ;, /* are all blocked (SQL injection prevention)
+//   4. 10-SECOND TIMEOUT — prevents runaway queries from hogging resources
+//   5. MAX 50 ROWS — prevents accidental data dumps
 //
-// The agent can also call GetSchemaAsync() first to learn column names
-// before writing its SQL query.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// GPT-4o typically calls GetSchemaAsync() FIRST to learn column names, then writes
+// a SQL query using QuerySqlAsync(). Results are formatted as markdown tables.
+//
+// INTERVIEW TIP: "The agent can write SQL, but it's sandboxed — SELECT only, whitelisted
+// views, blocked keywords, timeout, and row limits. It can never modify data."
+// =====================================================================================
 using System.ComponentModel;
 using System.Text;
 using Microsoft.Data.SqlClient;
@@ -23,11 +30,12 @@ namespace AgenticRAG.Core.Tools;
 public class SqlQueryTool
 {
     private readonly string _connectionString;
-    private readonly HashSet<string> _allowedViews;  // Whitelist — agent can ONLY query these views
+    private readonly HashSet<string> _allowedViews;  // WHITELIST — agent can ONLY query these views
 
     public SqlQueryTool(SqlServerSettings settings)
     {
         _connectionString = settings.ConnectionString;
+        // Load allowed views from config, or fall back to default enterprise views
         _allowedViews = new HashSet<string>(
             settings.AllowedViews.Count > 0
                 ? settings.AllowedViews
@@ -35,6 +43,7 @@ public class SqlQueryTool
             StringComparer.OrdinalIgnoreCase);
     }
 
+    // This [Description] tells GPT-4o when to use this tool and what data is available
     [Description("Query structured business data from SQL Server. " +
                  "Available views: " +
                  "vw_BillingOverview (VendorName, ContractNumber, ContractStatus, InvoiceNumber, InvoiceDate, Amount, PaidAmount, InvoiceStatus, OutstandingBalance) — " +
@@ -47,25 +56,31 @@ public class SqlQueryTool
         [Description("A SELECT SQL query using ONLY the allowed views (vw_BillingOverview, vw_ContractSummary, vw_InvoiceDetail, vw_VendorAnalysis). " +
                      "Example: SELECT VendorName, Amount, OutstandingBalance FROM vw_BillingOverview WHERE VendorName LIKE '%Contoso%'")] string sqlQuery)
     {
+        // STEP 1: Validate the query BEFORE executing — block anything dangerous
         if (!ValidateQuery(sqlQuery, out string error))
             return $"QUERY BLOCKED: {error}";
 
         try
         {
+            // STEP 2: Execute the validated query against SQL Server
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
 
             using var command = new SqlCommand(sqlQuery, connection);
-            command.CommandTimeout = 10;
+            command.CommandTimeout = 10;  // 10-second timeout to prevent runaway queries
 
             using var reader = await command.ExecuteReaderAsync();
+
+            // STEP 3: Format results as a markdown table (GPT-4o reads this well)
             var sb = new StringBuilder();
 
+            // Build table header
             var columns = Enumerable.Range(0, reader.FieldCount)
                 .Select(i => reader.GetName(i)).ToList();
             sb.AppendLine("| " + string.Join(" | ", columns) + " |");
             sb.AppendLine("| " + string.Join(" | ", columns.Select(_ => "---")) + " |");
 
+            // Build table rows (max 50 to prevent data dumps)
             int rowCount = 0;
             while (await reader.ReadAsync() && rowCount < 50)
             {
@@ -85,6 +100,8 @@ public class SqlQueryTool
         }
     }
 
+    // GPT-4o calls this FIRST to learn what columns and views are available
+    // before writing its SQL query — prevents column name guessing errors
     [Description("Get the schema (column names and types) of available SQL views. " +
                  "Call this FIRST if you're unsure about column names.")]
     public Task<string> GetSchemaAsync()
@@ -134,8 +151,13 @@ public class SqlQueryTool
    - TotalOutstanding (DECIMAL)");
     }
 
-    /// Validates the agent-generated SQL for safety before execution.
-    /// Blocks writes, dangerous keywords, and queries against non-whitelisted objects.
+    // ── SQL SECURITY VALIDATOR ──
+    // Checks the agent-generated SQL BEFORE execution. Blocks:
+    //   1. Non-SELECT statements (INSERT, UPDATE, DELETE, DROP, etc.)
+    //   2. Dangerous keywords (EXEC, xp_, sp_, --, ;, /* — SQL injection vectors)
+    //   3. Queries against non-whitelisted tables/views
+    // This is defense-in-depth — even if GPT-4o tries to write dangerous SQL,
+    // it gets blocked here before reaching the database.
     private bool ValidateQuery(string sql, out string error)
     {
         error = "";
