@@ -1,0 +1,1767 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG Evaluation — What You Actually Need</title>
+  <style>
+:root {
+  --sidebar-w: 280px;
+  --bg: #f0f2f5;
+  --panel: #1b1f3b;
+  --panel-hover: rgba(255,255,255,.07);
+  --panel-active: rgba(99,140,255,.22);
+  --text: #eaedf6;
+  --muted: #9aa3c4;
+  --accent: #638cff;
+  --content-bg: #ffffff;
+  --content-text: #1e2330;
+  --code-bg: #f6f8fc;
+  --border: #d6dce8;
+  --heading-color: #1a2744;
+  --table-stripe: #f9fafd;
+  --interview-bg: #fff8e6;
+  --interview-border: #ffc94d;
+  --callout-bg: #eef4ff;
+  --callout-border: #a0bfff;
+  --radius: 10px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+       background: var(--bg); color: var(--content-text); line-height: 1.72; font-size: 16px; }
+#progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); width: 0%; z-index: 999; transition: width .15s; }
+.layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--panel); border-right: 1px solid rgba(255,255,255,.06); scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+.sidebar-header { padding: 1.25rem 1.1rem .6rem; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: .5rem; }
+.sidebar-header h2 { margin: 0; font-size: .82rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+.sidebar-header .book-title { margin: .35rem 0 0; font-size: 1.05rem; color: #fff; font-weight: 700; }
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar > .toc > ul { padding: 0 .55rem .8rem; }
+.sidebar li { margin: 1px 0; }
+.sidebar a { color: var(--text); text-decoration: none; display: block; padding: .38rem .65rem; border-radius: 6px; font-size: .88rem; transition: background .15s, color .15s; }
+.sidebar a:hover { background: var(--panel-hover); color: #fff; }
+.sidebar a.active { background: var(--panel-active); color: #fff; font-weight: 600; }
+.sidebar li li a { padding-left: 1.6rem; font-size: .84rem; color: var(--muted); }
+.content { max-width: 880px; margin: 0 auto; padding: 2.5rem 3rem 6rem; }
+h1 { font-size: 1.9rem; color: var(--heading-color); margin: 2.5rem 0 .8rem; border-bottom: 2px solid var(--accent); padding-bottom: .4rem; }
+h2 { font-size: 1.45rem; color: var(--heading-color); margin: 2rem 0 .6rem; }
+h3 { font-size: 1.15rem; color: var(--heading-color); margin: 1.6rem 0 .5rem; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.2rem; overflow-x: auto; font-size: .88rem; line-height: 1.6; font-family: 'Cascadia Code', Consolas, monospace; }
+code { font-family: 'Cascadia Code', Consolas, monospace; font-size: .88em; }
+p code, li code, td code { background: var(--code-bg); padding: .15em .35em; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .92rem; }
+th, td { padding: .55rem .75rem; border: 1px solid var(--border); text-align: left; }
+th { background: var(--heading-color); color: #fff; font-weight: 600; font-size: .85rem; }
+tr:nth-child(even) { background: var(--table-stripe); }
+.interview { background: var(--interview-bg); border-left: 4px solid var(--interview-border); margin: 1.2rem 0; padding: .8rem 1.1rem; border-radius: var(--radius); }
+.callout { background: var(--callout-bg); border-left: 4px solid var(--callout-border); margin: 1.2rem 0; padding: .8rem 1.1rem; border-radius: var(--radius); }
+.diagram { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; font-family: 'Cascadia Code', Consolas, monospace; font-size: .85rem; line-height: 1.5; overflow-x: auto; white-space: pre; }
+.pass { color: #22863a; font-weight: 700; }
+.fail { color: #d73a49; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h2>AgenticRAG</h2>
+    <div class="book-title">RAG Evaluation Guide</div>
+  </div>
+  <div class="toc">
+    <ul>
+      <li><a href="#why">1. Why Evaluate RAG?</a></li>
+      <li><a href="#two-layers">2. Two Layers to Evaluate</a></li>
+      <li>
+        <a href="#retrieval">3. Retrieval Metrics</a>
+        <ul>
+          <li><a href="#precision">3.1 Precision@K</a></li>
+          <li><a href="#recall">3.2 Recall@K</a></li>
+          <li><a href="#mrr">3.3 MRR</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#generation">4. Generation Metrics</a>
+        <ul>
+          <li><a href="#groundedness">4.1 Groundedness</a></li>
+          <li><a href="#faithfulness">4.2 Faithfulness</a></li>
+          <li><a href="#relevance">4.3 Relevance</a></li>
+        </ul>
+      </li>
+      <li><a href="#llm-judge">5. LLM-as-Judge Pattern</a></li>
+      <li><a href="#golden-test-set">6. Golden Test Set</a></li>
+      <li>
+        <a href="#ragas">7. RAGAS — Deep Dive</a>
+        <ul>
+          <li><a href="#ragas-internals">7.1 How RAGAS Works Inside</a></li>
+          <li><a href="#ragas-example">7.2 Full Worked Example</a></li>
+          <li><a href="#ragas-output">7.3 Output Breakdown</a></li>
+          <li><a href="#ragas-mapping">7.4 Concept → RAGAS Map</a></li>
+          <li><a href="#ragas-foundry">7.5 Azure AI Foundry</a></li>
+        </ul>
+      </li>
+      <li><a href="#cicd">8. CI/CD Quality Gate</a></li>
+      <li>
+        <a href="#production">9. Production Monitoring</a>
+        <ul>
+          <li><a href="#monitoring-tiers">9.1 Monitoring Tiers</a></li>
+          <li><a href="#alerting">9.2 Alerting Rules</a></li>
+          <li><a href="#cost-at-scale">9.3 Cost at Scale</a></li>
+          <li><a href="#drift-detection">9.4 Drift Detection</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#diagnosis">10. Diagnosing Failures</a>
+        <ul>
+          <li><a href="#failure-tree">10.1 Failure Decision Tree</a></li>
+          <li><a href="#common-fixes">10.2 Common Fixes</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#interview">11. Interview Deep Dive</a>
+        <ul>
+          <li><a href="#interview-paragraph">11.1 The One-Paragraph Answer</a></li>
+          <li><a href="#interview-concepts">11.2 Concept Questions</a></li>
+          <li><a href="#interview-scenarios">11.3 Scenario-Based Questions</a></li>
+          <li><a href="#interview-architecture">11.4 Architecture Questions</a></li>
+          <li><a href="#interview-remember">11.5 The 3 Things to Remember</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#hallucination">12. Hallucination Detection &amp; Resolution</a>
+        <ul>
+          <li><a href="#halluc-types">12.1 Taxonomy of Hallucinations</a></li>
+          <li><a href="#halluc-pipeline">12.2 Detection Pipeline</a></li>
+          <li><a href="#halluc-resolution">12.3 Resolution Strategies</a></li>
+          <li><a href="#halluc-production">12.4 Production Monitoring</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#continuous-improvement">13. Continuous Improvement Pipeline</a>
+        <ul>
+          <li><a href="#ci-flywheel">13.1 The Improvement Flywheel</a></li>
+          <li><a href="#ci-feedback">13.2 Feedback Collection</a></li>
+          <li><a href="#ci-auto-eval">13.3 Automated Evaluation Loop</a></li>
+          <li><a href="#ci-prompt-tuning">13.4 Data-Driven Prompt Tuning</a></li>
+          <li><a href="#ci-retraining">13.5 Retrieval Retraining</a></li>
+          <li><a href="#ci-ab-testing">13.6 A/B Testing &amp; Canary</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#latency">14. Latency Optimization</a>
+        <ul>
+          <li><a href="#lat-retrieval">14.1 Retrieval Layer</a></li>
+          <li><a href="#lat-generation">14.2 Generation Layer</a></li>
+          <li><a href="#lat-architecture">14.3 Architecture</a></li>
+          <li><a href="#lat-biggest-wins">14.4 Biggest Wins</a></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<main class="content">
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="why">1. Why Evaluate RAG?</h1>
+
+<p>A RAG system that "works" is not the same as one that's <strong>reliable</strong>. Without evaluation:</p>
+<ul>
+  <li>You won't know if it's hallucinating until a user complains</li>
+  <li>You can't measure if a prompt change made things better or worse</li>
+  <li>You can't block bad deployments before they reach production</li>
+</ul>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "Every production RAG needs automated evaluation with pass/fail thresholds. I evaluate retrieval and generation separately, run it on every PR, and block merges if faithfulness drops below 0.80."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="two-layers">2. Two Layers to Evaluate</h1>
+
+<p>A RAG pipeline is <strong>two systems</strong> — both can fail independently:</p>
+
+<div class="diagram">
+  User Question
+       │
+       ▼
+┌──────────────┐     ┌──────────────┐
+│  RETRIEVER   │────▶│  GENERATOR   │
+│  (Search)    │     │  (LLM)       │
+└──────┬───────┘     └──────┬───────┘
+       │                    │
+  Did it find          Did it produce
+  the RIGHT            a GROUNDED
+  chunks?              answer?
+       │                    │
+  Precision@K          Faithfulness
+  Recall@K             Groundedness
+  MRR                  Relevance
+</div>
+
+<table>
+  <tr><th>If retrieval bad + generation good</th><td>Confident-sounding <strong>wrong</strong> answers (worst case)</td></tr>
+  <tr><th>If retrieval good + generation bad</th><td>Garbled version of correct information</td></tr>
+  <tr><th>Both good</th><td>Trustworthy answer</td></tr>
+</table>
+
+<div class="callout">
+  <strong>Key insight:</strong> Retrieval metrics need NO LLM calls (free, instant). Generation metrics use an LLM-as-judge (~$0.005 per eval). Always check retrieval first — if chunks are wrong, no amount of prompt tuning helps.
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="retrieval">3. Retrieval Metrics</h1>
+
+<p>Pure math — no LLM call, no cost, deterministic. You need a <strong>golden test set</strong> that labels which chunks are relevant for each question.</p>
+
+<h2 id="precision">3.1 Precision@K — "Of what I retrieved, how much is relevant?"</h2>
+
+<table>
+  <tr><th>Formula</th><td><code>relevant_in_top_k / k</code></td></tr>
+  <tr><th>Example</th><td>Retrieved 5 chunks, 3 are relevant → 3/5 = <strong>0.60</strong></td></tr>
+  <tr><th>Good</th><td>&gt; 0.70</td></tr>
+</table>
+
+<h3>Worked example:</h3>
+<pre>
+Question: "What is the termination notice period?"
+
+Retrieved chunks (K=5):
+  [1] "Section 12.1: Either party may terminate with 90 days written notice." → ✅ Relevant
+  [2] "Appendix C: Fee schedule for 2024-2025."                              → ❌ Irrelevant
+  [3] "Section 12.2: Notice must be delivered to the registered address."    → ✅ Relevant
+  [4] "Section 1.1: This agreement is between Company A and Company B."      → ❌ Irrelevant
+  [5] "Section 12.3: Exceptions to notice for material breach."              → ✅ Relevant
+
+Precision@5 = 3 relevant / 5 total = 0.60
+
+What this tells you: 40% of the context the LLM receives is noise.
+The LLM wastes tokens processing fee schedules and party names.
+</pre>
+
+<p><strong>Low precision means:</strong> LLM gets noisy context → worse answers + higher token cost. At K=10 with precision 0.30, 70% of your context window is wasted on junk.<br/>
+<strong>Fix:</strong> Raise score threshold, enable semantic reranker (Azure AI Search built-in), add metadata filters (e.g., filter by document section type).</p>
+
+<h2 id="recall">3.2 Recall@K — "Of all relevant chunks, how many did I find?"</h2>
+
+<table>
+  <tr><th>Formula</th><td><code>relevant_retrieved / total_relevant_in_corpus</code></td></tr>
+  <tr><th>Example</th><td>8 relevant chunks exist, retrieved 3 → 3/8 = <strong>0.375</strong></td></tr>
+  <tr><th>Good</th><td>&gt; 0.60</td></tr>
+</table>
+
+<h3>Worked example:</h3>
+<pre>
+Question: "What is the termination notice period?"
+
+All relevant chunks in the entire corpus (ground truth):
+  [A] "Section 12.1: Either party may terminate with 90 days written notice."
+  [B] "Section 12.2: Notice must be delivered to the registered address."
+  [C] "Section 12.3: Exceptions to notice for material breach."
+  [D] "Section 12.4: Partial termination requires 30 days notice."
+
+Our retriever found: [A], [B], [C] — missed [D]
+
+Recall@5 = 3 found / 4 total = 0.75
+
+What this tells you: The answer will miss "partial termination" info.
+If a user asks about partial termination, they get an incomplete answer.
+</pre>
+
+<p><strong>Low recall means:</strong> Missing important info → incomplete answers. Users get partial truths.<br/>
+<strong>Fix:</strong> Increase top-K (from 5 to 8), improve embedding model, add synonym expansion, enable hybrid search (BM25 catches keyword matches that embeddings miss).</p>
+
+<div class="callout">
+  <strong>Precision vs Recall trade-off:</strong> Increasing K improves recall but may hurt precision. At K=5: clean but possibly incomplete. At K=15: comprehensive but full of noise. Sweet spot is usually K=5 for focused questions, K=8-10 for broad ones. A semantic reranker (Step 2 after retrieval) is the best fix — it lets you retrieve K=20 then rerank to the top 5, getting both high recall AND high precision.
+</div>
+
+<h2 id="mrr">3.3 MRR — "Is the best chunk ranked first?"</h2>
+
+<table>
+  <tr><th>Formula</th><td><code>1 / rank_of_first_relevant_result</code></td></tr>
+  <tr><th>Example</th><td>First relevant at rank 1 → MRR = <strong>1.0</strong>. At rank 3 → MRR = <strong>0.33</strong></td></tr>
+  <tr><th>Good</th><td>&gt; 0.80</td></tr>
+</table>
+
+<p><strong>Why MRR matters for RAG:</strong> LLMs have a <em>"lost in the middle"</em> bias — they pay most attention to the first and last chunks. If the relevant chunk is buried at position 4, the LLM anchors on irrelevant content above it.</p>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "MRR tells me if the retriever is front-loading relevant results. Even with high recall, if MRR is low, the LLM sees junk first — that's the 'lost in the middle' problem."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="generation">4. Generation Metrics</h1>
+
+<p>These measure: "Given the retrieved context, did the LLM produce a good answer?" They require an <strong>LLM-as-judge</strong> call (explained in section 5).</p>
+
+<h2 id="groundedness">4.1 Groundedness — "Does the answer ONLY use info from context?"</h2>
+
+<p><strong>The #1 metric. Non-negotiable.</strong></p>
+
+<table>
+  <tr><th>What it checks</th><td>Every claim in the answer must be traceable to the retrieved context</td></tr>
+  <tr><th>Good</th><td>&gt; 0.90</td></tr>
+  <tr><th>Block deploys if</th><td class="fail">&lt; 0.80</td></tr>
+</table>
+
+<pre>
+Context: "The contract requires 90 days written notice for termination."
+
+✅ Grounded: "The notice period is 90 days, in writing."
+   → Score 1.0
+
+❌ Hallucinated: "Notice is 90 days, sent via certified mail to the registered agent."
+   → Score 0.5 ("certified mail" and "registered agent" invented)
+</pre>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "Groundedness is my top priority. A grounded-but-incomplete answer is safe — the user asks a follow-up. A hallucinated-but-complete answer is dangerous — the user trusts wrong info. I block deployment if groundedness &lt; 0.80."
+</div>
+
+<h2 id="faithfulness">4.2 Faithfulness — "Are the specific facts correct?"</h2>
+
+<p>Stricter than groundedness — checks individual facts (numbers, names, dates) against context.</p>
+
+<table>
+  <tr><th>Type</th><th>Groundedness Failure</th><th>Faithfulness Failure</th></tr>
+  <tr><td>Definition</td><td>Inventing info not in context</td><td>Distorting facts from context</td></tr>
+  <tr><td>Example</td><td>"sent via certified mail" (context never mentions mail method)</td><td>"$1.5M cap" (context says "$1M cap")</td></tr>
+  <tr><td>Which is worse?</td><td>Both are dangerous</td><td>Faithfulness failures are <strong>harder to catch</strong> because the topic IS in context — the detail is just wrong</td></tr>
+</table>
+
+<h3>Detailed example — faithfulness failure in action:</h3>
+<pre>
+Context: "Section 5.3: Late payments shall accrue interest at 1.5% per month
+          on the outstanding balance, capped at 18% annually."
+
+✅ Faithful: "Late payments incur 1.5% monthly interest, capped at 18% per year."
+   → Score 1.0 (all facts match exactly)
+
+❌ Unfaithful: "Late payments incur 2% monthly interest with no annual cap."
+   → Score 0.0 (1.5% → 2%, 18% cap → "no cap" — both facts distorted)
+
+❌ Subtly unfaithful: "Late payments incur 1.5% monthly interest, capped at 15% annually."
+   → Score 0.5 (interest rate correct, annual cap wrong: 18% → 15%)
+   → This is the HARDEST failure to catch — the answer looks right at a glance
+</pre>
+
+<div class="callout">
+  <strong>Common LLM mistake:</strong> paraphrasing "90 days" as "3 months" — technically equivalent but NOT what the document says. Finance and legal teams care about exact wording. In a contract review RAG, this could be a compliance violation. That's why RAGAS decomposes into exact claims rather than holistic scoring.
+</div>
+
+<h2 id="relevance">4.3 Relevance — "Does it answer the actual question?"</h2>
+
+<table>
+  <tr><th>What it checks</th><td>Answer directly addresses what was asked</td></tr>
+  <tr><th>Good</th><td>&gt; 0.80</td></tr>
+  <tr><th>Common failure</th><td>Ask about termination → get answer about renewal (both in same document section)</td></tr>
+</table>
+
+<h3>Detailed example — relevance failure:</h3>
+<pre>
+Question: "What is the termination notice period?"
+
+Context includes both:
+  - "Section 12: Termination requires 90 days notice."
+  - "Section 11: Renewal requires 60 days notice."
+
+❌ Low relevance answer: "The contract renewal requires 60 days written notice
+   prior to the end of the current term."
+   → Faithfulness: 1.0 (fact IS in context)
+   → Relevance: 0.30 (user asked about TERMINATION, got RENEWAL)
+
+This is why you need BOTH metrics. An answer can be perfectly faithful
+to the context but completely miss the user's question.
+</pre>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "Faithfulness and relevance catch different failures. An answer can be 100% faithful — every fact comes from context — but 0% relevant because it's answering the wrong question. Both happen when the retriever returns chunks about the right document but the wrong section. You need both metrics to trust the system."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="llm-judge">5. LLM-as-Judge — How Every Eval Tool Works Inside</h1>
+
+<p>This is the core pattern used by <strong>RAGAS, DeepEval, Azure AI Foundry</strong>. Understanding this makes you credible in interviews — you know what's under the hood.</p>
+
+<h3>The pattern:</h3>
+<ol>
+  <li>Take the question, context, and generated answer</li>
+  <li>Send them to a <strong>separate</strong> GPT-4o instance (not the one that generated the answer)</li>
+  <li>Ask it to score groundedness, faithfulness, relevance on a 0-1 scale</li>
+  <li>Use <strong>temperature = 0</strong> for deterministic scoring</li>
+  <li>Parse the JSON scores</li>
+</ol>
+
+<pre>
+# What RAGAS / DeepEval do internally (simplified):
+
+Judge Prompt:
+  "You are a strict evaluator. Score 0.0 to 1.0.
+   Question: {question}
+   Context: {retrieved_chunks}
+   Answer: {generated_answer}
+
+   groundedness: Does answer ONLY use info from context?
+   faithfulness: Are specific facts correct per context?
+   relevance: Does it answer the question?
+
+   JSON only: {groundedness: 0.0, faithfulness: 0.0, relevance: 0.0}"
+
+→ GPT-4o (temperature=0)
+→ {"groundedness": 0.92, "faithfulness": 0.88, "relevance": 0.95}
+</pre>
+
+<table>
+  <tr><th>Approach</th><th>Cost per eval</th><th>Correlation with humans</th></tr>
+  <tr><td>Human reviewer</td><td>~$2.00</td><td>1.0 (baseline)</td></tr>
+  <tr><td><strong>GPT-4o as judge</strong></td><td><strong>~$0.005</strong></td><td><strong>~0.85</strong></td></tr>
+  <tr><td>Rule-based (regex)</td><td>$0</td><td>~0.40</td></tr>
+</table>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "All major eval tools — RAGAS, DeepEval, Azure AI Foundry — use the same pattern: a separate GPT-4o instance judges each answer. Temperature 0 for reproducibility. ~$0.005 per eval, ~85% correlation with human reviewers."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="golden-test-set">6. Golden Test Set — The Only Manual Step</h1>
+
+<p>This is the <strong>most important step</strong> and the one teams skip. Without it, you're evaluating nothing.</p>
+
+<h3>What is it?</h3>
+<p>20-50 real questions with expected key-point answers, categorized by topic.</p>
+
+<h3>Rules:</h3>
+<ol>
+  <li><strong>Real questions</strong> — from chat logs and support tickets, NOT invented by engineers</li>
+  <li><strong>Key points, not exact answers</strong> — list the facts the answer MUST contain</li>
+  <li><strong>Categories</strong> — so you can see which document types are failing</li>
+  <li><strong>Include adversarial questions</strong> (20%) — answer is NOT in the documents</li>
+</ol>
+
+<h3>Example:</h3>
+<pre>
+[
+  {
+    "question": "What is the termination notice period?",
+    "expected_key_points": "90 days, written notice, both parties",
+    "category": "contracts",
+    "answer_in_docs": true
+  },
+  {
+    "question": "What is the CEO's personal phone number?",
+    "expected_key_points": "Should refuse — not in documents",
+    "category": "adversarial",
+    "answer_in_docs": false
+  }
+]
+</pre>
+
+<div class="callout">
+  <strong>Adversarial questions test hallucination resistance.</strong> A system that always answers — even when it shouldn't — is dangerous. 20% of your test set should be things the system should say "I don't know" to.
+</div>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "I build a golden test set of 30+ real questions from chat logs, with expected key points and categories. 20% are adversarial — the answer doesn't exist in our documents. This tests if the system says 'I don't know' vs. hallucinating."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+    <h1 id="pii-handling">6A. PII Handling in RAG Evaluation</h1>
+
+    <p><strong>Why it matters:</strong> RAG systems often process sensitive data (names, emails, IDs, health info). Mishandling PII can lead to compliance violations, data leaks, and user mistrust. <strong>Evaluation pipelines must never leak or store real PII.</strong></p>
+
+    <h3>Best Practices for PII Handling</h3>
+    <ul>
+      <li><strong>Redact PII in logs and evaluation data:</strong> Before logging user questions, answers, or evaluation traces, use a PII redaction function to remove names, emails, phone numbers, SSNs, etc.</li>
+      <li><strong>Keep LLM/evaluation calls within secure boundaries:</strong> Use Azure OpenAI in the same region/tenant as your data. Never send PII to public endpoints or third-party LLMs.</li>
+      <li><strong>Access control for human review:</strong> Only authorized reviewers can access logs or feedback with PII. Enforce RBAC in your review dashboard.</li>
+      <li><strong>Automated PII detection:</strong> Use Azure Content Safety or regex to scan and redact PII before storing or displaying data.</li>
+      <li><strong>Golden test set hygiene:</strong> Never include real PII in your golden test set. Use synthetic or anonymized data for all test questions and answers.</li>
+    </ul>
+
+    <h3>Sample PII Handling Workflow</h3>
+    <ol>
+      <li>User submits a question (may contain PII)</li>
+      <li>Before logging or storing, run a PII redaction utility</li>
+      <li>Only send data to Azure OpenAI in-region (never public LLMs)</li>
+      <li>Store only redacted logs and evaluation traces</li>
+      <li>Golden test set is reviewed to ensure no real PII is present</li>
+    </ol>
+
+    <div class="callout">
+      <strong>Interview answer:</strong> "All evaluation logs and golden test sets are PII-scrubbed before storage. We use Azure OpenAI in-region, redact PII from logs and feedback, and restrict human review access via RBAC. No real PII is ever stored or sent outside our tenant."
+    </div>
+
+    <div class="interview">
+      <strong>Q: "How do you ensure PII is handled safely in RAG evaluation?"</strong><br />
+      <strong>A:</strong> "We run automated PII redaction on all logs and evaluation data, use only in-tenant Azure OpenAI, and never include real PII in our golden test set. Human review is RBAC-restricted."
+    </div>
+<h1 id="ragas">7. RAGAS — Deep Dive</h1>
+
+<p>In production, <strong>you don't write custom evaluation code</strong>. You use <strong>RAGAS</strong> (Retrieval-Augmented Generation Assessment) — the most popular open-source RAG eval framework. Every concept from sections 3-6 maps directly to a RAGAS metric. This section shows exactly how.</p>
+
+<h2 id="ragas-internals">7.1 How RAGAS Works Inside — Metric by Metric</h2>
+
+<p>RAGAS needs <strong>four columns</strong> of data. Each column feeds specific metrics:</p>
+
+<div class="diagram">
+Your RAG Pipeline produces:          RAGAS evaluates:
+─────────────────────────            ────────────────────
+question      ─────────────────────▶ answer_relevancy (is answer on-topic?)
+                                     context_precision (are retrieved chunks relevant?)
+                                     context_recall (did we find all relevant chunks?)
+
+contexts      ─────────────────────▶ context_precision (is junk mixed in?)
+(retrieved chunks from search)       faithfulness (does answer stick to these chunks?)
+
+answer        ─────────────────────▶ faithfulness (any hallucinated claims?)
+(LLM-generated response)            answer_relevancy (does it address the question?)
+
+ground_truth  ─────────────────────▶ context_recall (did retriever find chunks matching this?)
+(expected key points)                answer_correctness (optional: is answer factually right?)
+</div>
+
+<h3>How each metric calculates — step by step:</h3>
+
+<h3><code>faithfulness</code> — Our Groundedness + Faithfulness combined</h3>
+<p>This is the <strong>most important metric</strong>. RAGAS does NOT score it as a single number — it decomposes the answer into individual <strong>claims</strong>, then checks each one.</p>
+
+<pre>
+RAGAS faithfulness — internal steps:
+
+Step 1: DECOMPOSE answer into atomic claims
+  Answer: "The notice period is 90 days. Notice must be written.
+           It should be sent via certified mail."
+  → Claims: ["notice period is 90 days",
+             "notice must be written",
+             "should be sent via certified mail"]
+
+Step 2: CHECK each claim against context (LLM-as-judge)
+  Claim 1: "notice period is 90 days" → Context says "90 days" → ✅ SUPPORTED
+  Claim 2: "notice must be written"   → Context says "written notice" → ✅ SUPPORTED
+  Claim 3: "sent via certified mail"  → Context says nothing about mail method → ❌ NOT SUPPORTED
+
+Step 3: CALCULATE
+  faithfulness = supported_claims / total_claims = 2/3 = 0.667
+</pre>
+
+<div class="callout">
+  <strong>Why decomposition matters:</strong> If RAGAS just asked "is this answer faithful?" it would get vague 0.7-0.8 scores. By checking each claim separately, you can see <em>exactly which sentence</em> is hallucinated. This is actionable.
+</div>
+
+<h3><code>context_precision</code> — Our Precision@K</h3>
+<p>RAGAS checks: of the chunks you retrieved, how many were actually useful for answering this question?</p>
+
+<pre>
+Step 1: Judge ranks each retrieved chunk as relevant or irrelevant
+  Chunk 1: "Contract termination requires 90 days..." → ✅ Relevant
+  Chunk 2: "Appendix A: pricing schedule..."          → ❌ Irrelevant
+  Chunk 3: "Both parties must provide written..."     → ✅ Relevant
+  Chunk 4: "Office hours are 9am to 5pm..."           → ❌ Irrelevant
+  Chunk 5: "Notice period exceptions for breach..."   → ✅ Relevant
+
+Step 2: context_precision = relevant / total = 3/5 = 0.60
+</pre>
+
+<h3><code>context_recall</code> — Our Recall@K</h3>
+<p>Uses <code>ground_truth</code> — did the retriever find chunks covering all expected key points?</p>
+
+<pre>
+ground_truth: "90 days, written notice, both parties, exceptions for breach"
+
+Step 1: Break ground_truth into key points
+  → ["90 days", "written notice", "both parties", "exceptions for breach"]
+
+Step 2: Check if retrieved chunks contain each key point
+  "90 days"              → Found in Chunk 1 ✅
+  "written notice"       → Found in Chunk 3 ✅
+  "both parties"         → Found in Chunk 3 ✅
+  "exceptions for breach"→ Found in Chunk 5 ✅
+
+Step 3: context_recall = found / total = 4/4 = 1.00
+</pre>
+
+<h3><code>answer_relevancy</code> — Our Relevance</h3>
+<p>RAGAS uses a <strong>reverse technique</strong>: it generates hypothetical questions from the answer, then checks similarity to the original question.</p>
+
+<pre>
+Original question: "What is the termination notice period?"
+
+Step 1: Generate 3 hypothetical questions from the answer
+  "What is the notice period for contract termination?"
+  "How many days notice is required?"
+  "What form must termination notice take?"
+
+Step 2: Calculate embedding similarity between original and each generated question
+  Similarity: 0.95, 0.88, 0.72
+
+Step 3: answer_relevancy = average = 0.85
+</pre>
+
+<div class="callout">
+  <strong>Why reverse?</strong> If the answer talks about the right topic, the generated questions will be similar to the original. If the answer drifts off-topic (e.g., discusses renewal instead of termination), the generated questions will be about renewal — low similarity to the original.
+</div>
+
+<h2 id="ragas-example">7.2 Full Worked Example — 3 Test Questions, Start to Finish</h2>
+
+<p>You prepare a <code>golden_test_set.json</code> with questions, expected answers, retrieved contexts, and ground truth — then call <code>evaluate()</code> with your chosen metrics and a judge LLM (GPT-4o at temperature 0). RAGAS scores every question individually.</p>
+
+<h2 id="ragas-output">7.3 RAGAS Output — What You Actually See</h2>
+
+<h3>Overall scores (what <code>print(result)</code> shows):</h3>
+<pre>
+{
+  'faithfulness':       0.889,
+  'answer_relevancy':   0.912,
+  'context_precision':  0.722,
+  'context_recall':     0.917
+}
+</pre>
+
+<h3>Per-question breakdown (what <code>result.to_pandas()</code> shows):</h3>
+<pre>
+result_df = result.to_pandas()
+print(result_df.to_string())
+
+                                          question  faithfulness  answer_relevancy  context_precision  context_recall
+0            What is the termination notice period?         1.000             0.950              0.667           1.000
+1                    What are the payment terms?            1.000             0.920              1.000           1.000
+2  Can I transfer the contract to another company?          0.667             0.865              0.500           0.750
+</pre>
+
+<h3>How to read this output — question by question:</h3>
+
+<table>
+  <tr><th>#</th><th>Question</th><th>Score</th><th>What Happened</th></tr>
+  <tr>
+    <td>Q1</td>
+    <td>Termination notice</td>
+    <td class="pass">faithfulness: 1.0</td>
+    <td>All claims in the answer trace back to context. Perfect.</td>
+  </tr>
+  <tr>
+    <td>Q1</td>
+    <td></td>
+    <td>context_precision: 0.667</td>
+    <td>Retrieved 3 chunks, but "Appendix C: Fee schedule" was irrelevant → 2/3 useful</td>
+  </tr>
+  <tr>
+    <td>Q2</td>
+    <td>Payment terms</td>
+    <td class="pass">All metrics &gt; 0.90</td>
+    <td>Clean retrieval (2/2 relevant chunks) + clean generation. Ideal.</td>
+  </tr>
+  <tr>
+    <td>Q3</td>
+    <td>Contract transfer</td>
+    <td class="fail">faithfulness: 0.667</td>
+    <td>Answer has 3 claims. 2 are supported. 1 is <strong>hallucinated</strong> — RAGAS flagged it.</td>
+  </tr>
+  <tr>
+    <td>Q3</td>
+    <td></td>
+    <td class="fail">context_recall: 0.75</td>
+    <td>Ground truth has 3 key points; retriever only found chunks covering 2 of them.</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>This is why per-question scores matter.</strong> The overall faithfulness (0.889) looks fine. But Q3 is 0.667 — that's a hallucination hiding in the average. Always check the per-question breakdown.
+</div>
+
+<p>At the end of <code>run_ragas.py</code>, compare each metric against thresholds and <code>sys.exit(1)</code> if faithfulness or relevance fall below 0.80. This integrates directly into CI/CD to block merges.</p>
+
+<h2 id="ragas-mapping">7.4 Where Every Concept Fits — Complete Map</h2>
+
+<p>Everything from sections 3–6 maps into RAGAS. Here's the complete picture:</p>
+
+<table>
+  <tr><th>Our Concept (Sec 3-6)</th><th>RAGAS Metric</th><th>How RAGAS Calculates It</th><th>LLM Judge Needed?</th></tr>
+  <tr>
+    <td><strong>Precision@K</strong> (§3.1)</td>
+    <td><code>context_precision</code></td>
+    <td>LLM judges each retrieved chunk as relevant/irrelevant → ratio</td>
+    <td>Yes (~$0.002)</td>
+  </tr>
+  <tr>
+    <td><strong>Recall@K</strong> (§3.2)</td>
+    <td><code>context_recall</code></td>
+    <td>Breaks ground_truth into key points, checks if chunks cover each</td>
+    <td>Yes (~$0.002)</td>
+  </tr>
+  <tr>
+    <td><strong>MRR</strong> (§3.3)</td>
+    <td><em>Not a default RAGAS metric</em></td>
+    <td>Calculate manually: rank of first relevant chunk. Or use <code>context_precision</code> which penalizes late-ranked relevant chunks.</td>
+    <td>N/A</td>
+  </tr>
+  <tr>
+    <td><strong>Groundedness</strong> (§4.1)</td>
+    <td rowspan="2"><code>faithfulness</code></td>
+    <td rowspan="2">Decomposes answer into claims, verifies each against context. Catches both invented info AND distorted facts.</td>
+    <td rowspan="2">Yes (~$0.005)</td>
+  </tr>
+  <tr>
+    <td><strong>Faithfulness</strong> (§4.2)</td>
+  </tr>
+  <tr>
+    <td><strong>Relevance</strong> (§4.3)</td>
+    <td><code>answer_relevancy</code></td>
+    <td>Generates hypothetical questions from answer, measures embedding similarity to original</td>
+    <td>Yes (~$0.003)</td>
+  </tr>
+  <tr>
+    <td><strong>LLM-as-Judge</strong> (§5)</td>
+    <td><em>The engine under ALL RAGAS metrics</em></td>
+    <td>Every RAGAS metric calls GPT-4o (or your configured LLM) to judge</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><strong>Golden Test Set</strong> (§6)</td>
+    <td><code>ground_truth</code> column</td>
+    <td>Your expected answers feed context_recall and answer_correctness</td>
+    <td>—</td>
+  </tr>
+</table>
+
+<div class="diagram">
+Your Evaluation Pipeline — How It All Connects:
+
+golden_test_set.json                    Your RAG Pipeline
+      │                                       │
+      │  30 questions +                       │  For each question:
+      │  expected key points                  │  1. Retrieve chunks
+      │                                       │  2. Generate answer
+      ▼                                       ▼
+┌─────────────────────────────────────────────────┐
+│                  RAGAS evaluate()                 │
+│                                                   │
+│  question ──────▶ answer_relevancy (§4.3)        │
+│  contexts ──────▶ context_precision (§3.1)       │
+│  answer   ──────▶ faithfulness (§4.1 + §4.2)    │
+│  ground_truth ──▶ context_recall (§3.2)          │
+│                                                   │
+│  Engine: LLM-as-Judge (§5) — GPT-4o, temp=0     │
+└──────────────────────┬───────────────────────────┘
+                       │
+                       ▼
+              Scores per question
+              + overall averages
+                       │
+                       ▼
+              CI/CD pass/fail gate (§8)
+</div>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "RAGAS maps directly to the evaluation concepts: <code>faithfulness</code> = our groundedness + faithfulness (it decomposes answers into claims and checks each one), <code>context_precision</code> = Precision@K, <code>context_recall</code> = Recall@K, <code>answer_relevancy</code> = relevance. Under the hood, every metric uses LLM-as-judge with GPT-4o at temperature 0. I use the per-question breakdown to find exactly which questions are hallucinating — the overall average can hide problems."
+</div>
+
+<h2 id="ragas-foundry">7.5 Azure AI Foundry — Zero-Code Alternative</h2>
+
+<p>For teams that don't want Python scripts, <strong>Azure AI Foundry</strong> provides the same evaluation via a UI:</p>
+
+<table>
+  <tr><th>Feature</th><th>RAGAS (Python)</th><th>Azure AI Foundry</th></tr>
+  <tr><td>Setup</td><td><code>pip install ragas</code> + 15 lines</td><td>Portal UI — click-through wizard</td></tr>
+  <tr><td>Metrics</td><td>faithfulness, relevancy, context_precision, context_recall</td><td>Groundedness, Coherence, Fluency, Relevance, Similarity</td></tr>
+  <tr><td>LLM Judge</td><td>Any OpenAI/Azure model</td><td>Built-in GPT-4o (managed by Azure)</td></tr>
+  <tr><td>CI/CD</td><td>Python script + exit code</td><td>REST API or <code>promptflow</code> CLI for automation</td></tr>
+  <tr><td>Cost</td><td>Pay for judge LLM calls only</td><td>Bundled in AI Foundry pricing</td></tr>
+  <tr><td>Dashboard</td><td>Build your own (pandas/Power BI)</td><td>Built-in with trend charts</td></tr>
+  <tr><td>Best for</td><td>Full control, open-source, CI/CD heavy</td><td>Azure-native teams, quick start, no Python</td></tr>
+</table>
+
+<p>Azure AI Foundry offers the same evaluations via <code>GroundednessEvaluator</code> and <code>RelevanceEvaluator</code> against a <code>golden_test_set.jsonl</code> — zero-code portal with built-in trend charts for non-technical stakeholders.</p>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "I use RAGAS for CI/CD automation and Azure AI Foundry for stakeholder dashboards. RAGAS gives me per-claim faithfulness decomposition — I can see exactly which sentence hallucinated. Foundry gives non-technical reviewers a portal with trend charts. Both use LLM-as-judge internally — same concept, different packaging."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="cicd">8. CI/CD Quality Gate</h1>
+
+<p>Run evaluation automatically on every PR that touches prompts, search config, or chunking logic. A GitHub Actions workflow installs RAGAS, runs <code>python eval/run_ragas.py</code>, and fails the PR if thresholds are not met.</p>
+
+<h3>Thresholds that block a PR:</h3>
+<table>
+  <tr><th>Metric</th><th>Block if below</th><th>Why</th></tr>
+  <tr><td>Faithfulness</td><td class="fail">0.80</td><td>Hallucination risk — safety critical</td></tr>
+  <tr><td>Relevance</td><td class="fail">0.80</td><td>Answering wrong questions</td></tr>
+  <tr><td>Context Precision</td><td>0.70</td><td>Retrieval noise → worse answers</td></tr>
+</table>
+
+<div class="callout">
+  <strong>Rule:</strong> Block on <strong>safety metrics</strong> (faithfulness, groundedness). Warn on quality metrics (precision, recall). Never let hallucination regressions ship.
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="production">9. Production Monitoring — Continuous Evaluation</h1>
+
+<p>You can't run full LLM-judge on every live query (too slow at ~3 sec per eval, too expensive at scale). The real-world approach is a <strong>tiered monitoring system</strong> — cheap + fast checks on everything, expensive + thorough checks on a sample.</p>
+
+<h2 id="monitoring-tiers">9.1 Four Monitoring Tiers</h2>
+
+<table>
+  <tr><th>Tier</th><th>Coverage</th><th>What</th><th>Cost</th><th>Latency</th><th>Catches</th></tr>
+  <tr>
+    <td><strong>1. Thumbs up/down</strong></td>
+    <td>100% (opt-in by user)</td>
+    <td>Button in chat UI</td>
+    <td>$0</td>
+    <td>0ms</td>
+    <td>User dissatisfaction — broad signal, easy to collect</td>
+  </tr>
+  <tr>
+    <td><strong>2. Reflection score</strong></td>
+    <td>100% of queries</td>
+    <td>LLM self-check after generation</td>
+    <td>~$0.001/query</td>
+    <td>~500ms added</td>
+    <td>Obvious hallucinations, incomplete answers, off-topic drift</td>
+  </tr>
+  <tr>
+    <td><strong>3. RAGAS async eval</strong></td>
+    <td>3-5% random sample</td>
+    <td>Background job, fires after response sent</td>
+    <td>~$0.012/eval</td>
+    <td>0ms (async)</td>
+    <td>Faithfulness drift, precision degradation, recall gaps</td>
+  </tr>
+  <tr>
+    <td><strong>4. Human review</strong></td>
+    <td>0.5-1% sample</td>
+    <td>Weekly reviewer queue</td>
+    <td>~$2.00/review</td>
+    <td>24-48h</td>
+    <td>Tone, clarity, nuance, edge cases automated tools miss</td>
+  </tr>
+</table>
+
+<div class="diagram">
+Live Query Flow with Monitoring:
+
+User Question
+     │
+     ▼
+┌────────────┐    ┌────────────┐    ┌────────────┐
+│  Retrieve   │───▶│  Generate   │───▶│  Reflect   │──▶ Response to user
+│  chunks     │    │  answer     │    │  (Tier 2)  │
+└─────┬──────┘    └─────┬──────┘    └─────┬──────┘
+      │                 │                 │
+      │     Log everything (Tier 1 ready) │
+      ▼                 ▼                 ▼
+┌──────────────────────────────────────────────┐
+│  Request Log (App Insights / Cosmos DB)       │
+│  question | contexts | answer | reflection    │
+│  score | thumbs_vote | latency | timestamp    │
+└──────────────────┬───────────────────────────┘
+                   │
+          ┌────────┴─────────┐
+          ▼                  ▼
+   3-5% sampled         0.5% sampled
+   ┌──────────┐        ┌──────────┐
+   │ RAGAS    │        │ Human    │
+   │ Async    │        │ Review   │
+   │ (Tier 3) │        │ (Tier 4) │
+   └──────────┘        └──────────┘
+</div>
+
+<div class="callout">
+  <strong>Launch week strategy:</strong> Start Tier 3 at <strong>10% sampling</strong> to establish baselines. After 1 week (once you have ~500+ evaluated queries), drop to 3-5%. Tier 4 human reviews: start immediately — 20-30 answers reviewed by a domain expert in week 1 to calibrate your expectations.
+</div>
+
+<h2 id="alerting">9.2 Alerting Rules</h2>
+
+<table>
+  <tr><th>Signal</th><th>Source</th><th>Alert If</th><th>Likely Cause</th><th>Severity</th></tr>
+  <tr>
+    <td>Weekly avg faithfulness</td>
+    <td>Tier 3 RAGAS</td>
+    <td>Drops below 0.85</td>
+    <td>Prompt regression or model update</td>
+    <td class="fail">Critical — page on-call</td>
+  </tr>
+  <tr>
+    <td>Thumbs-down rate</td>
+    <td>Tier 1 UI</td>
+    <td>Exceeds 15% (7-day rolling)</td>
+    <td>Retrieval or generation degradation</td>
+    <td class="fail">Critical</td>
+  </tr>
+  <tr>
+    <td>"I don't know" rate drops suddenly</td>
+    <td>Response parsing</td>
+    <td>Week-over-week drop &gt; 20%</td>
+    <td><strong>System started hallucinating instead of refusing</strong></td>
+    <td class="fail">Critical — most dangerous signal</td>
+  </tr>
+  <tr>
+    <td>"I don't know" rate spikes suddenly</td>
+    <td>Response parsing</td>
+    <td>Week-over-week spike &gt; 30%</td>
+    <td>Retrieval broke — returning empty results</td>
+    <td>Warning</td>
+  </tr>
+  <tr>
+    <td>Context precision</td>
+    <td>Tier 3 RAGAS</td>
+    <td>Drops below 0.65</td>
+    <td>New documents indexed with bad chunking</td>
+    <td>Warning</td>
+  </tr>
+  <tr>
+    <td>Avg response latency</td>
+    <td>App Insights</td>
+    <td>P95 exceeds 10 seconds</td>
+    <td>Search index degradation or model throttling</td>
+    <td>Warning</td>
+  </tr>
+  <tr>
+    <td>Reflection score avg</td>
+    <td>Tier 2</td>
+    <td>Drops below 6.0 (out of 10)</td>
+    <td>Generation quality drop — correlate with model version</td>
+    <td>Warning</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>The scariest alert:</strong> "I don't know" rate dropping. It means the system stopped being cautious and started confidently answering things it shouldn't. This is the hallucination indicator you'll miss if you only watch faithfulness scores (because RAGAS only evaluates a 5% sample — the hallucinated answers might be in the other 95%).
+</div>
+
+<h2 id="cost-at-scale">9.3 Cost at Scale</h2>
+
+<p>What does production monitoring cost for a real system?</p>
+
+<table>
+  <tr><th>Scale</th><th>Queries/month</th><th>Tier 2 (Reflection)</th><th>Tier 3 (RAGAS 5%)</th><th>Tier 4 (Human 0.5%)</th><th>Total Eval Cost</th></tr>
+  <tr>
+    <td>Small app</td><td>10,000</td>
+    <td>$10</td>
+    <td>$6 (500 evals × $0.012)</td>
+    <td>$100 (50 reviews × $2)</td>
+    <td><strong>~$116/month</strong></td>
+  </tr>
+  <tr>
+    <td>Medium app</td><td>100,000</td>
+    <td>$100</td>
+    <td>$60 (5,000 evals)</td>
+    <td>$1,000 (500 reviews)</td>
+    <td><strong>~$1,160/month</strong></td>
+  </tr>
+  <tr>
+    <td>Large app</td><td>1,000,000</td>
+    <td>$1,000</td>
+    <td>$600 (50K evals at 5%)</td>
+    <td>$2,000 (1K reviews, capped)</td>
+    <td><strong>~$3,600/month</strong></td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>Cost optimization:</strong> For large apps, reduce RAGAS sampling to 1-2% once baselines are stable. Cap human reviews at 200/month — beyond that, you get diminishing returns. The biggest lever is reflection (Tier 2): a 500ms self-check catches 60-70% of obvious failures at $0.001/query.
+</div>
+
+<h2 id="drift-detection">9.4 Drift Detection — When Things Silently Break</h2>
+
+<p>The three types of drift that silently destroy RAG quality:</p>
+
+<table>
+  <tr><th>Drift Type</th><th>What Happens</th><th>How to Detect</th><th>Fix</th></tr>
+  <tr>
+    <td><strong>Model drift</strong></td>
+    <td>Azure updates GPT-4o version silently. New version behaves differently.</td>
+    <td>Log <code>model_version</code> per request. Compare faithfulness before/after version change.</td>
+    <td><strong>Pin model version</strong> in deployment: <code>"gpt-4o-2024-08-06"</code> not <code>"gpt-4o"</code>. Test new versions before switching.</td>
+  </tr>
+  <tr>
+    <td><strong>Data drift</strong></td>
+    <td>New documents indexed (quarterly reports, policy updates). Chunking may be wrong for new format.</td>
+    <td>Track context_precision per document source. New sources will show lower precision.</td>
+    <td>Test chunking on each new document type. Create category-specific golden test questions.</td>
+  </tr>
+  <tr>
+    <td><strong>Query drift</strong></td>
+    <td>Users start asking different types of questions than what you trained/tested for.</td>
+    <td>Cluster questions weekly using embeddings. Look for new clusters not covered by golden test set.</td>
+    <td>Add new real questions to golden test set monthly. Expand categories.</td>
+  </tr>
+</table>
+
+<h3>Model version management — the #1 production lesson:</h3>
+<pre>
+// ❌ BAD — Azure can change this anytime
+var deployment = "gpt-4o";  // Points to "latest" — could change overnight
+
+// ✅ GOOD — pinned to specific version
+var deployment = "gpt-4o-2024-08-06";  // Specific version you tested
+// When Azure releases new version:
+//   1. Deploy to staging with new version
+//   2. Run RAGAS golden test set against staging
+//   3. Compare scores to baseline
+//   4. Only switch production if scores >= baseline
+</pre>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "In production, I monitor RAG at four tiers: thumbs-up/down on all queries, reflection scoring on 100%, RAGAS on a 5% async sample via Azure Functions, and weekly human review of 20-30 answers. I log question + contexts + answer + model version per request to Cosmos DB — that's the data RAGAS consumes async. The most dangerous drift is model version changes — Azure can update silently. I pin model versions and gate upgrades behind RAGAS evaluation. The scariest alert is 'I don't know' rate dropping — that means the system started hallucinating instead of refusing."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="diagnosis">10. Diagnosing Failures — When Scores Drop</h1>
+
+<h2 id="failure-tree">10.1 Failure Decision Tree</h2>
+
+<div class="diagram">
+Bad Answer Reported
+│
+├─ Is Context Precision low? (retrieved chunks are junk)
+│  └─ YES → RETRIEVAL problem
+│     ├─ Score threshold too low?
+│     │   └─ Fix: raise minimum_score in search config
+│     ├─ Wrong embedding model?
+│     │   └─ Fix: switch to text-embedding-3-large (3072d)
+│     ├─ Bad chunking?
+│     │   └─ Fix: add chunk overlap, preserve section headers
+│     └─ No metadata filter?
+│         └─ Fix: add category/date filters to search
+│
+├─ Is Faithfulness low? (answer hallucinates)
+│  └─ YES → GENERATION problem — HALLUCINATION
+│     ├─ System prompt too loose?
+│     │   └─ Fix: add "ONLY answer from the provided context"
+│     ├─ Temperature too high?
+│     │   └─ Fix: lower from 0.7 to 0.1 for factual answers
+│     └─ Context window overflow?
+│         └─ Fix: reduce top-K or summarize long chunks
+│
+├─ Is Relevance low? (answers wrong question)
+│  └─ YES → GENERATION problem — MISUNDERSTANDING
+│     ├─ Query ambiguous?
+│     │   └─ Fix: add query reformulation / expansion step
+│     └─ Missing conversation context?
+│         └─ Fix: include more history turns in prompt
+│
+└─ All scores OK but user unhappy?
+   └─ HUMAN PERCEPTION problem — tone, verbosity, jargon
+      └─ Collect thumbs-down feedback, review weekly
+         └─ Fix: adjust system prompt for tone/conciseness
+</div>
+
+<h2 id="common-fixes">10.2 Common Fixes (Quick Reference)</h2>
+
+<table>
+  <tr><th>Problem</th><th>Symptom</th><th>Quick Fix</th></tr>
+  <tr>
+    <td>Precision too low</td>
+    <td>LLM gets noisy/irrelevant context</td>
+    <td>Enable semantic reranking (Azure AI Search built-in). Raise score threshold.</td>
+  </tr>
+  <tr>
+    <td>Recall too low</td>
+    <td>Missing important info in answers</td>
+    <td>Increase top-K from 5 to 8. Improve chunk overlap.</td>
+  </tr>
+  <tr>
+    <td>MRR too low</td>
+    <td>Good results buried in middle of context</td>
+    <td>Enable semantic reranking. Switch to hybrid search (BM25 + vector).</td>
+  </tr>
+  <tr>
+    <td>Groundedness low</td>
+    <td>Hallucinating facts not in documents</td>
+    <td>Tighten system prompt: "ONLY answer from provided context." Lower temperature to 0.1.</td>
+  </tr>
+  <tr>
+    <td>Faithfulness low</td>
+    <td>Wrong numbers/dates/names</td>
+    <td>Add "cite exact quotes" to system prompt. Lower temperature.</td>
+  </tr>
+  <tr>
+    <td>Relevance low</td>
+    <td>Answers a different question</td>
+    <td>Add query expansion or reformulation step before retrieval.</td>
+  </tr>
+  <tr>
+    <td>"I don't know" rate too high</td>
+    <td>System refuses everything</td>
+    <td>Check if search index is empty or broken. Verify embedding dimensions match.</td>
+  </tr>
+  <tr>
+    <td>"I don't know" rate too low</td>
+    <td>Never refuses, always answers</td>
+    <td>Tighten system prompt to refuse when context is irrelevant. Add reflection step.</td>
+  </tr>
+  <tr>
+    <td>All metrics drop at once</td>
+    <td>Nothing changed in code</td>
+    <td><strong>Azure silently updated the model version.</strong> Pin model version in deployment.</td>
+  </tr>
+</table>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "When scores drop, I follow a decision tree: check retrieval metrics first (precision), then generation (faithfulness), then relevance. The most common surprise failure is Azure updating the model version silently — I always pin model versions."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="interview">11. Interview Deep Dive</h1>
+
+<h2 id="interview-paragraph">11.1 The One-Paragraph Answer (memorize this)</h2>
+
+<div class="callout" style="font-size: 1.05rem;">
+  "I evaluate RAG at two layers. <strong>Retrieval</strong>: did we find the right chunks? I measure Precision@K and MRR — no LLM needed, pure math against a golden test set. <strong>Generation</strong>: is the answer grounded? I use RAGAS with GPT-4o as an LLM judge — it decomposes every answer into atomic claims and checks each one against the context. I run this on 30+ real questions in CI/CD and block PRs if faithfulness drops below 0.80. In production, I log every request to Cosmos DB, run RAGAS async on a 5% random sample via Azure Functions, collect thumbs-up/down on all queries, and alert if faithfulness trends below 0.85 weekly."
+</div>
+
+<h2 id="interview-concepts">11.2 Concept Questions — "Do You Understand Evaluation?"</h2>
+
+<div class="interview">
+  <strong>Q: "How do you evaluate a RAG system?"</strong><br />
+  <strong>A:</strong> "Two separate layers — retrieval and generation — because they fail independently. Retrieval: did the search find the right chunks? I use Precision@K (how much retrieved content is relevant) and MRR (is the best chunk ranked first). Generation: is the answer grounded? I use RAGAS which scores faithfulness by decomposing the answer into individual claims and checking each against the context. The worst scenario is bad retrieval + good generation — the LLM sounds confident about wrong information."
+</div>
+
+<div class="interview">
+  <strong>Q: "What is faithfulness and why does it matter most?"</strong><br />
+  <strong>A:</strong> "Faithfulness = does the answer ONLY use facts from the provided context? Score 0 to 1. RAGAS calculates it by breaking the answer into atomic claims — 'notice period is 90 days', 'notice must be written', 'sent via certified mail' — then checks each claim against the chunks. If the context never mentions 'certified mail', that claim is unsupported → score drops. A grounded-but-incomplete answer is safe (user asks follow-up). A hallucinated-but-complete answer is dangerous (user trusts wrong info). That's why I block deployments below 0.80."
+</div>
+
+<div class="interview">
+  <strong>Q: "Explain Groundedness vs Faithfulness."</strong><br />
+  <strong>A:</strong> "Groundedness: is the claim IN the context at all? Faithfulness: is the claim ACCURATE per the context? Example: context says '$1M liability cap'. Answer says '$1.5M liability cap'. That passes groundedness (it's about liability caps, which is in context) but fails faithfulness (the number is wrong — $1M distorted to $1.5M). In RAGAS, the <code>faithfulness</code> metric covers both — it checks if each claim is supported AND accurate."
+</div>
+
+<div class="interview">
+  <strong>Q: "What's MRR and why does it matter for RAG specifically?"</strong><br />
+  <strong>A:</strong> "MRR = 1 divided by the rank of the first relevant result. If the best chunk is at position 1, MRR = 1.0. At position 4, MRR = 0.25. It matters for RAG because of the 'lost in the middle' problem — research shows LLMs pay most attention to the first and last chunks in context. If relevant info is buried at position 3 out of 5, the LLM anchors on the irrelevant chunks above it. High recall but low MRR means you found the right content but presented it in the wrong order."
+</div>
+
+<div class="interview">
+  <strong>Q: "What's a golden test set and how do you build one?"</strong><br />
+  <strong>A:</strong> "30-50 real questions from chat logs and support tickets — NOT invented by engineers. Each has expected key points (not exact answers) and a category (contracts, HR, finance). 20% are adversarial — questions where the answer is NOT in the documents. The adversarial set tests hallucination resistance: does the system say 'I don't have that information' or does it make something up? I update the golden set monthly by adding new real-user questions from categories where RAGAS scores are lowest."
+</div>
+
+<div class="interview">
+  <strong>Q: "How does LLM-as-judge work?"</strong><br />
+  <strong>A:</strong> "Every eval tool — RAGAS, DeepEval, Azure AI Foundry — uses the same pattern: send the question + context + answer to a separate GPT-4o instance (not the one that generated the answer) at temperature 0 for deterministic scoring. It scores groundedness, faithfulness, relevance on 0-1 scale. Cost: ~$0.005 per evaluation. Correlation with human reviewers: ~85%. It's not perfect — that's why you also do human review on 1% of traffic — but it's 400x cheaper and 100x faster than humans for the other 99%."
+</div>
+
+<h2 id="interview-scenarios">11.3 Scenario-Based Questions — "What Would You Do?"</h2>
+
+<div class="interview">
+  <strong>Q: "Your faithfulness score dropped from 0.92 to 0.71 after a deployment. Walk me through your investigation."</strong><br />
+  <strong>A:</strong> "First, I check the per-question RAGAS breakdown — which specific questions failed? If all questions degraded: likely a prompt or model change. If only one category dropped: likely a retrieval issue with that document type.<br /><br />
+  1. <strong>Check model version</strong> — did Azure silently update GPT-4o? Compare <code>model_version</code> field in request logs before and after. This is the #1 surprise failure.<br />
+  2. <strong>Check the prompt diff</strong> — did someone change the system prompt? Especially look for removed constraints like 'only answer from context'.<br />
+  3. <strong>Check retrieval</strong> — pull the retrieved chunks for the failing questions. Are they relevant? If context_precision also dropped → retrieval problem, not generation.<br />
+  4. <strong>Check chunking</strong> — were new documents indexed? New PDFs sometimes chunk differently → search returns garbage.<br />
+  5. <strong>Roll back</strong> — if it's a code change, revert and confirm scores recover. If it's a model update, pin the previous version."
+</div>
+
+<div class="interview">
+  <strong>Q: "You're launching a new RAG system next week. Walk me through your evaluation plan."</strong><br />
+  <strong>A:</strong> "Three phases:<br /><br />
+  <strong>Phase 1 — Before launch (this week):</strong><br />
+  - Build golden test set: 30 real questions from stakeholders and support tickets. 20% adversarial.<br />
+  - Run RAGAS locally: get baseline scores for faithfulness, relevancy, context_precision, context_recall.<br />
+  - Gate: faithfulness must be ≥ 0.85 or we don't launch.<br /><br />
+  <strong>Phase 2 — Launch week:</strong><br />
+  - Deploy request-level logging: question, contexts, answer, model_version, latency, reflection_score → Cosmos DB.<br />
+  - Set RAGAS sampling at 10% (higher than normal — establishing baselines).<br />
+  - Human review: domain expert reviews 30 answers daily for first 3 days.<br />
+  - Monitor thumbs-down rate hourly.<br /><br />
+  <strong>Phase 3 — Steady state (week 2+):</strong><br />
+  - Drop RAGAS sampling to 5%.<br />
+  - Human review weekly (20-30 answers).<br />
+  - Set up alerts: faithfulness &lt; 0.85 → Critical, thumbs-down &gt; 15% → Critical.<br />
+  - Monthly: add 5-10 new golden test questions from production edge cases."
+</div>
+
+<div class="interview">
+  <strong>Q: "Users are complaining about wrong answers but your RAGAS scores look fine. What's happening?"</strong><br />
+  <strong>A:</strong> "Three possible causes:<br /><br />
+  1. <strong>RAGAS is only evaluating 5% of traffic.</strong> The bad answers might be in the other 95%. Fix: temporarily increase sampling to 20% or pull the specific complaint questions and run RAGAS manually.<br />
+  2. <strong>Relevance problem, not faithfulness.</strong> The answer is grounded (facts come from context) but it's answering the wrong question. The user asked about termination but got information about renewal — both topics exist in the same document. Check <code>answer_relevancy</code> scores by category.<br />
+  3. <strong>Tone/format problem.</strong> The answer is correct but too long, too technical, or presented poorly. RAGAS doesn't measure this. Fix: human review (Tier 4) on the specific complaint patterns."
+</div>
+
+<div class="interview">
+  <strong>Q: "How do you evaluate multi-turn conversations?"</strong><br />
+  <strong>A:</strong> "Multi-turn is harder because context carries over. I evaluate at two levels:<br />
+  - <strong>Per-turn:</strong> same RAGAS evaluation on each individual turn (question + context + answer).<br />
+  - <strong>Conversation-level:</strong> did the overall conversation resolve the user's intent? I check: does the last answer contain all key points from the golden test set? I also check that the system doesn't contradict itself between turns — e.g., saying '90 days' in turn 1 and '60 days' in turn 3. For the golden test set, I include 5-10 multi-turn scenarios with expected resolution across 3-4 turns."
+</div>
+
+<div class="interview">
+  <strong>Q: "All metrics dropped at the same time but nobody changed the code. What happened?"</strong><br />
+  <strong>A:</strong> "Three likely causes in order of probability:<br />
+  1. <strong>Azure updated the model version</strong> — this is the #1 surprise in production. Check the <code>model_version</code> field in your request logs. If it changed, pin the previous version and test the new one separately.<br />
+  2. <strong>Search index corrupted or rebuilt</strong> — an index rebuild can change document IDs and scores. Check if index stats (document count, last updated timestamp) changed.<br />
+  3. <strong>Embedding model drift</strong> — if you upgraded the embedding model without re-indexing all documents, old and new embeddings are incompatible. Similarity scores become meaningless. Fix: re-index all documents with the new embeddings."
+</div>
+
+<h2 id="interview-architecture">11.4 Architecture Questions — "How Do You Design This?"</h2>
+
+<div class="interview">
+  <strong>Q: "Design the evaluation architecture for a RAG system handling 100K queries/month."</strong><br />
+  <strong>A:</strong><br />
+  <pre style="background: white; border: none; padding: 0; margin: .5rem 0;">
+Request flow:
+  App Service → Cosmos DB (log every request)
+                     │
+              Azure Function (change feed)
+                     │
+              5% → Service Bus → Python Function → RAGAS → scores back to Cosmos
+                     │
+              100% → App Insights (latency, tokens, reflection_score)
+
+Evaluation data stored per request:
+  question, contexts[], answer, reflection_score, model_version,
+  retrieval_latency, generation_latency, total_tokens, thumbs_vote
+
+Monthly cost:  ~$116 (10K) to ~$1,160 (100K)
+  Tier 2 reflection: $100 | Tier 3 RAGAS 5%: $60 | Tier 4 human: $1,000
+
+CI/CD:
+  golden_test_set.json (30+ questions) → python eval/run_ragas.py
+  Block if: faithfulness &lt; 0.80 or answer_relevancy &lt; 0.80
+  Warn if: context_precision &lt; 0.65
+
+Alerts:
+  Critical: faithfulness &lt; 0.85 weekly, thumbs-down &gt; 15%, "I don't know" drops 20%
+  Warning: latency P95 &gt; 10s, precision &lt; 0.65
+  </pre>
+</div>
+
+<div class="interview">
+  <strong>Q: "How do you ensure evaluation doesn't add latency to the user experience?"</strong><br />
+  <strong>A:</strong> "Two strategies:<br />
+  - <strong>Tier 2 (reflection)</strong> adds ~500ms. I pipeline it — the reflection check starts while the response is streaming to the user, so perceived latency is near zero.<br />
+  - <strong>Tier 3 (RAGAS)</strong> is fully async — fires after the response is sent. The request is logged to Cosmos DB, change feed triggers an Azure Function, which decides whether to sample this request. If sampled, it queues to Service Bus and a Python function runs RAGAS. The user never waits for any of this."
+</div>
+
+<div class="interview">
+  <strong>Q: "How do you handle evaluation for a RAG system with sensitive/PII data?"</strong><br />
+  <strong>A:</strong> "Three safeguards:<br />
+  1. <strong>Judge LLM stays within Azure</strong> — I use Azure OpenAI, same region as my data. No data leaves the tenant.<br />
+  2. <strong>Redact PII in eval logs</strong> — before writing to Cosmos DB, strip names, emails, SSNs from the question and answer fields used by RAGAS.<br />
+  3. <strong>Human review access control</strong> — Tier 4 reviewers are domain experts with appropriate data access clearance. The review queue app enforces RBAC — reviewers only see their designated categories."
+</div>
+
+<h2 id="interview-remember">11.5 The 3 Things to Remember Above All</h2>
+
+<table>
+  <tr><td style="font-size:1.5rem; text-align:center; width:50px;">1</td><td><strong>Golden test set</strong> — 30+ real questions, 20% adversarial. The only manual work. Updated monthly.</td></tr>
+  <tr><td style="font-size:1.5rem; text-align:center;">2</td><td><strong>Faithfulness ≥ 0.80</strong> — the one number that matters most. Block deploys below this. RAGAS decomposes into claims to tell you exactly what hallucinated.</td></tr>
+  <tr><td style="font-size:1.5rem; text-align:center;">3</td><td><strong>4-tier production monitoring</strong> — thumbs-vote on 100%, reflection on 100%, RAGAS on 5% async, human review on 1%. Alert on "I don't know" rate dropping — it means hallucination replaced refusal.</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="hallucination">12. Real-World Hallucination Detection &amp; Resolution</h1>
+
+<p>Hallucination is the <strong>#1 trust-killer</strong> in production RAG. A system that confidently invents facts is worse than one that says "I don't know." This section covers the full pipeline: <em>detect → classify → resolve → prevent.</em></p>
+
+<h2 id="halluc-types">12.1 Taxonomy of Hallucinations</h2>
+
+<p>Not all hallucinations are equal. Understanding the type tells you <strong>where the fix belongs</strong>:</p>
+
+<table>
+  <tr><th>Type</th><th>Description</th><th>Example</th><th>Root Cause</th><th>Fix Layer</th></tr>
+  <tr>
+    <td><strong>Intrinsic</strong></td>
+    <td>Contradicts the retrieved context</td>
+    <td>Doc says "30-day refund" → answer says "60-day refund"</td>
+    <td>LLM training data overrides context</td>
+    <td>Prompt + Reflection</td>
+  </tr>
+  <tr>
+    <td><strong>Extrinsic</strong></td>
+    <td>Adds facts not in any retrieved chunk</td>
+    <td>Answer mentions a product feature that no document describes</td>
+    <td>LLM fills gaps from parametric memory</td>
+    <td>Prompt + Empty-result guard</td>
+  </tr>
+  <tr>
+    <td><strong>Fabricated Citation</strong></td>
+    <td>Cites [DocSource 3] but claim isn't in source 3</td>
+    <td>"Per [DocSource 2], SLA is 99.9%" — but source 2 is about billing</td>
+    <td>LLM associates citation markers loosely</td>
+    <td>Citation verification</td>
+  </tr>
+  <tr>
+    <td><strong>Numeric Drift</strong></td>
+    <td>Changes numbers, dates, percentages</td>
+    <td>Doc says $14,500 → answer says $15,000 (rounded/changed)</td>
+    <td>LLM approximates numbers</td>
+    <td>Extraction + comparison</td>
+  </tr>
+  <tr>
+    <td><strong>Confident Empty</strong></td>
+    <td>Answers when tool results were empty</td>
+    <td>Retriever found nothing → answer invents plausible facts</td>
+    <td>No guardrail on empty context</td>
+    <td>Empty-result guard</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>Real-world stat:</strong> In production RAG systems, extrinsic hallucinations (adding unsupported facts) account for ~60% of cases. Intrinsic (contradicting sources) is ~25%. Fabricated citations ~15%. Fixing extrinsic alone cuts total hallucination by more than half.
+</div>
+
+<h2 id="halluc-pipeline">12.2 Detection Pipeline</h2>
+
+<p>A multi-layered approach — no single technique catches everything:</p>
+
+<div class="diagram">
+Answer Generated
+│
+├─── Layer 1: EMPTY-RESULT GUARD (free, instant)
+│    All tools returned "no results"?
+│    └─ YES → force "I don't have enough information" response
+│    └─ NO  → continue
+│
+├─── Layer 2: CLAIM DECOMPOSITION (LLM call ~$0.003)
+│    Break answer into atomic claims:
+│    "The SLA is 99.9% and includes 24/7 support"
+│    → Claim 1: "The SLA is 99.9%"
+│    → Claim 2: "The SLA includes 24/7 support"
+│
+├─── Layer 3: CLAIM VERIFICATION (LLM call ~$0.005)
+│    For each claim, check against retrieved chunks:
+│    → Claim 1: SUPPORTED (DocSource 2, line 14)
+│    → Claim 2: NOT SUPPORTED (no chunk mentions 24/7 support)
+│
+├─── Layer 4: CITATION CROSS-CHECK (regex + LLM ~$0.002)
+│    [DocSource N] claims → verify fact exists in source N
+│
+├─── Layer 5: NUMERIC EXTRACTION (regex, free)
+│    Extract numbers from answer vs numbers from context
+│    Flag any number in answer not found in tool results
+│
+└─── VERDICT
+     - All claims supported → ✅ PASS
+     - 1+ unsupported claims → ⚠️ HALLUCINATION DETECTED
+       → Trigger resolution (retry with grounding prompt)
+</div>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "I use a 5-layer hallucination pipeline: empty-result guard catches the obvious case; claim decomposition breaks complex answers into verifiable statements; claim verification checks each against retrieved chunks using RAGAS faithfulness decomposition; citation cross-check validates [DocSource N] references; numeric extraction flags changed numbers. Layers 1 and 5 are free — no LLM cost. The full pipeline adds ~$0.01 per answer."
+</div>
+
+<p>The enhanced <code>ReflectionService</code> passes actual tool results to the evaluator (not just the answer), enabling it to cross-check specific claims. A structured <code>ReflectionResult</code> returns sub-scores for groundedness, completeness, citations, and clarity, plus a boolean <code>HallucinationDetected</code> flag. An empty-result guard in the orchestrator short-circuits with "I don't have enough information" whenever all tools returned no data — preventing the LLM from fabricating.</p>
+
+<h2 id="halluc-resolution">12.3 Resolution Strategies</h2>
+
+<p>When hallucination is detected, the fix depends on the type:</p>
+
+<table>
+  <tr><th>Detection Result</th><th>Resolution Strategy</th><th>Implementation</th></tr>
+  <tr>
+    <td>HallucinationDetected = true</td>
+    <td><strong>Grounding-focused retry</strong></td>
+    <td>Retry prompt: "Your answer contained unsupported claims. Regenerate using ONLY facts from tool results. Remove anything you cannot cite."</td>
+  </tr>
+  <tr>
+    <td>GroundedScore = 1 (severe)</td>
+    <td><strong>Strip and regenerate</strong></td>
+    <td>Discard answer completely. Re-prompt with explicit: "List only facts from the following context. If a fact isn't below, don't mention it."</td>
+  </tr>
+  <tr>
+    <td>Fabricated citation</td>
+    <td><strong>Citation stripping</strong></td>
+    <td>Regex: find [DocSource N] → verify claim exists in source N text → remove unverifiable citations</td>
+  </tr>
+  <tr>
+    <td>Numeric drift</td>
+    <td><strong>Number anchoring</strong></td>
+    <td>Extract all numbers from tool results. Replace any answer number not in the set with "[exact figure in document: X]"</td>
+  </tr>
+  <tr>
+    <td>Confident empty</td>
+    <td><strong>Hard block</strong></td>
+    <td>Empty-result guard (Layer 1) — never reaches the LLM</td>
+  </tr>
+  <tr>
+    <td>Still hallucinating after retry</td>
+    <td><strong>Escalate to GPT-4o + strict template</strong></td>
+    <td>Switch to the more capable model with a fill-in-the-blank template: "Based on [source], the answer is [quote]."</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>Why this matters:</strong> The old approach used the <em>same</em> retry prompt for hallucination and incompleteness. This is counterproductive — telling a hallucinating model to "search for more information" just gives it more context to hallucinate around. The grounding-focused prompt specifically instructs it to <em>remove</em> unsupported claims.
+</div>
+
+<h2 id="halluc-production">12.4 Production Hallucination Monitoring</h2>
+
+<p>Detection in production requires a tiered approach (you can't run $0.01 checks on every request at 10K RPM):</p>
+
+<table>
+  <tr><th>Tier</th><th>Check</th><th>Coverage</th><th>Cost</th><th>Latency</th></tr>
+  <tr>
+    <td>1</td>
+    <td>Empty-result guard</td>
+    <td>100% of requests</td>
+    <td>$0</td>
+    <td>0ms (regex)</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>Reflection with tool results</td>
+    <td>100% of requests</td>
+    <td>~$0.003/req</td>
+    <td>~500ms</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>Full claim decomposition (RAGAS faithfulness)</td>
+    <td>5% sample + all low-scoring</td>
+    <td>~$0.01/req</td>
+    <td>Async (not user-facing)</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>Human review of flagged answers</td>
+    <td>1% + all tier-3 failures</td>
+    <td>$2-5/review</td>
+    <td>Hours (batch)</td>
+  </tr>
+</table>
+
+<p>Key metrics: <strong>Hallucination Rate</strong> (target &lt;5%, alert &gt;10%), <strong>"I Don't Know" Rate</strong> (target 5-15%, alert if drops below 3%), <strong>Grounded Score median</strong> (alert if &lt;2.5/3), <strong>Citation Accuracy</strong> (target &gt;95%), <strong>Retry Rate</strong> (target &lt;10%, alert &gt;20%).</p>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "The most dangerous metric to watch is the 'I don't know' rate <em>dropping</em>. A healthy RAG system should refuse 5-15% of questions. If that drops to 2%, it means the model started hallucinating instead of refusing — it's confidently making things up. I alert on both hallucination rate rising AND refusal rate falling."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="continuous-improvement">13. Continuous Improvement Pipeline for Deployed GenAI</h1>
+
+<p>Deploying a GenAI customer support model is day 1. The real work is the <strong>improvement flywheel</strong> that makes it better every week without manual intervention.</p>
+
+<h2 id="ci-flywheel">13.1 The Improvement Flywheel</h2>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────┐
+│              CONTINUOUS IMPROVEMENT FLYWHEEL             │
+│                                                         │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐         │
+│   │  SERVE   │───▶│ COLLECT  │───▶│ EVALUATE │         │
+│   │ (Deploy) │    │(Feedback)│    │ (Score)  │         │
+│   └────▲─────┘    └──────────┘    └────┬─────┘         │
+│        │                               │               │
+│        │                               ▼               │
+│   ┌────┴─────┐    ┌──────────┐    ┌──────────┐         │
+│   │  DEPLOY  │◀───│   TUNE   │◀───│ DIAGNOSE │         │
+│   │(Canary)  │    │(Prompts/ │    │(Find weak│         │
+│   │          │    │ Retrieval)│    │ spots)   │         │
+│   └──────────┘    └──────────┘    └──────────┘         │
+│                                                         │
+│   Cycle time: 1 week (automated) / 1 month (retrain)   │
+└─────────────────────────────────────────────────────────┘
+</div>
+
+<h2 id="ci-feedback">13.2 Feedback Collection (SERVE → COLLECT)</h2>
+
+<p>Every interaction produces improvement signals — most teams only capture thumbs up/down and miss 80% of the signal:</p>
+
+<table>
+  <tr><th>Signal</th><th>Source</th><th>Volume</th><th>Quality</th><th>Implementation</th></tr>
+  <tr>
+    <td>Thumbs up/down</td>
+    <td>User explicit</td>
+    <td>~10% of users vote</td>
+    <td>Low (binary, no reason)</td>
+    <td>UI button → Event Hub → Cosmos DB</td>
+  </tr>
+  <tr>
+    <td>Reformulated query</td>
+    <td>User implicit</td>
+    <td>~20% of sessions</td>
+    <td>High (means first answer failed)</td>
+    <td>Detect same-session follow-up within 30s that rephrases</td>
+  </tr>
+  <tr>
+    <td>Escalation to human</td>
+    <td>User action</td>
+    <td>~5% of sessions</td>
+    <td>Very high (definitive failure)</td>
+    <td>Track "transfer to agent" click → log Q+A pair as failure</td>
+  </tr>
+  <tr>
+    <td>Reflection score</td>
+    <td>System (auto)</td>
+    <td>100% of answers</td>
+    <td>Medium (LLM self-eval)</td>
+    <td>ReflectionService runs on every answer, log score</td>
+  </tr>
+  <tr>
+    <td>RAGAS async eval</td>
+    <td>System (sampled)</td>
+    <td>5% of answers</td>
+    <td>High (multi-metric)</td>
+    <td>Background job, scores faithfulness/relevance/context</td>
+  </tr>
+  <tr>
+    <td>Human review</td>
+    <td>QA team</td>
+    <td>1% of answers</td>
+    <td>Highest (expert judgment)</td>
+    <td>Weekly review queue of flagged + random sampled answers</td>
+  </tr>
+</table>
+
+<h3>Implicit Failure Detection</h3>
+<p>Detect “reformulated queries” — when a user asks a semantically similar question within 30 seconds, the first answer likely failed. These reformulations (high embedding similarity, same session) go into the “needs improvement” queue automatically as strong training signals.</p>
+
+<h2 id="ci-auto-eval">13.3 Automated Evaluation Loop (COLLECT → EVALUATE → DIAGNOSE)</h2>
+
+<p>The weekly automated pipeline:</p>
+
+<div class="diagram">
+Scheduled: Every Monday 2 AM UTC
+│
+├─ 1. Pull last 7 days of production logs
+│     → Questions, answers, tool results, reflection scores, feedback
+│
+├─ 2. Run golden test set (30+ questions) against current system
+│     → Get fresh scores: faithfulness, relevance, precision, recall
+│
+├─ 3. Run RAGAS on 200 sampled production Q&amp;A pairs
+│     → Per-metric scores with claim-level breakdown
+│
+├─ 4. Compare with previous week's scores
+│     → Flag any metric that dropped &gt; 5%
+│
+├─ 5. Cluster failures by category
+│     → "70% of failures are about billing policies"
+│     → "30% are about product features added last month"
+│
+├─ 6. Generate improvement recommendations
+│     → "Add 5 billing policy documents to index"
+│     → "Tighten system prompt for date-related questions"
+│     → "Reduce top-K from 8 to 5 for simple factual queries"
+│
+└─ 7. Create improvement tickets (automated)
+      → JIRA/DevOps work items with evidence + suggested fix
+</div>
+
+<h2 id="ci-prompt-tuning">13.4 Data-Driven Prompt Tuning (DIAGNOSE → TUNE)</h2>
+
+<p>Don't guess at prompt changes — let the failure data drive them:</p>
+
+<table>
+  <tr><th>Failure Pattern</th><th>Diagnostic Signal</th><th>Prompt Fix</th><th>Validation</th></tr>
+  <tr>
+    <td>Hallucinating dates</td>
+    <td>Numeric drift detected in 15% of answers</td>
+    <td>Add: "When citing dates or numbers, quote them exactly as they appear in the source."</td>
+    <td>Re-run golden set → numeric drift should drop to &lt;3%</td>
+  </tr>
+  <tr>
+    <td>Missing context</td>
+    <td>Recall@5 dropped from 0.85 to 0.70</td>
+    <td>Not a prompt fix — retrieval fix: increase top-K to 8 or add hybrid search</td>
+    <td>Re-run retrieval metrics → recall should recover</td>
+  </tr>
+  <tr>
+    <td>Wrong tool selection</td>
+    <td>60% of billing Qs call SearchDocuments instead of QuerySql</td>
+    <td>Add: "For questions about amounts, invoices, billing → ALWAYS use QuerySqlAsync first."</td>
+    <td>Check tool usage logs → SQL tool usage for billing should rise to &gt;90%</td>
+  </tr>
+  <tr>
+    <td>Verbose answers</td>
+    <td>Thumbs-down correlated with answer length &gt; 500 words</td>
+    <td>Add: "Keep answers concise. Use bullet points. Target 100-200 words unless user asks for detail."</td>
+    <td>Measure avg answer length + thumbs-up rate</td>
+  </tr>
+  <tr>
+    <td>New topic failures</td>
+    <td>Cluster: "80% of failures are about new EHR module launched last week"</td>
+    <td>Not a prompt fix — knowledge fix: index new documents about the module</td>
+    <td>Re-run golden set with new questions about the module</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>Golden rule:</strong> Every prompt change must be validated against the golden test set before deployment. "Improved my bad example" is not validation. "Faithfulness went from 0.82 → 0.88 on 30 test questions with no regression on relevance" is validation.
+</div>
+
+<h2 id="ci-retraining">13.5 Retrieval Retraining (Monthly)</h2>
+
+<p>The retrieval layer degrades as new documents arrive and user patterns shift. Monthly cycle: (1) analyze low-Precision@K queries, (2) re-chunk poorly performing documents with better overlap/section-aware splitting, (3) update synonym maps for query-document vocabulary mismatches (e.g., users say “refund” but docs say “reimbursement”), (4) quarterly: fine-tune embedding model using thumbs-up pairs as training signal (only if 5K+ pairs available).</p>
+
+<h2 id="ci-ab-testing">13.6 A/B Testing &amp; Canary Deployments</h2>
+
+<p>Never deploy prompt changes or retrieval updates to 100% of traffic at once:</p>
+
+<div class="diagram">
+Prompt Change Ready
+│
+├─ Stage 1: GOLDEN TEST (pre-deploy)
+│  Run golden test set → all metrics ≥ baseline?
+│  └─ NO → reject change
+│  └─ YES → continue
+│
+├─ Stage 2: CANARY (5% traffic, 24 hours)
+│  Route 5% of production traffic to new version
+│  Monitor: hallucination rate, reflection scores, thumbs-down
+│  └─ Regression &gt; 3% → auto-rollback
+│  └─ Stable → continue
+│
+├─ Stage 3: RAMP (25% → 50% → 100%, each 24 hours)
+│  Gradual traffic increase with monitoring at each step
+│  Auto-rollback if any metric degrades &gt; 5%
+│
+└─ Stage 4: BASELINE UPDATE
+   New version becomes the baseline for next comparison
+   Archive old golden test results for trend analysis
+</div>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "My continuous improvement pipeline has 6 stages: <strong>Serve</strong> (deploy with canary), <strong>Collect</strong> (6 signal types: thumbs, reformulations, escalations, reflection, RAGAS, human review), <strong>Evaluate</strong> (weekly automated golden test + production sampling), <strong>Diagnose</strong> (cluster failures by category to find systemic issues), <strong>Tune</strong> (data-driven prompt changes validated against golden set), <strong>Deploy</strong> (canary → ramp with auto-rollback). The cycle runs weekly for prompt tuning, monthly for retrieval retraining. Every change is validated — we never push a 'feels better' prompt change without metrics proving it."
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<h1 id="latency">14. Latency Optimization in RAG Systems</h1>
+
+<p>Users expect sub-second responses. A RAG pipeline that takes 8-12 seconds kills adoption. Latency hides in every layer — retrieval, generation, and the orchestration glue between them. This section covers the proven strategies to cut end-to-end latency without sacrificing quality.</p>
+
+<h2 id="lat-retrieval">14.1 Retrieval Layer</h2>
+
+<table>
+  <tr><th>Strategy</th><th>How It Works</th><th>Typical Savings</th><th>Trade-off</th></tr>
+  <tr>
+    <td><strong>Semantic caching</strong></td>
+    <td>Hash the embedding of the query; if a near-duplicate was answered recently, return the cached result</td>
+    <td>Eliminates retrieval + generation entirely on cache hit (~95% reduction)</td>
+    <td>Stale answers if source data changes — set a TTL (e.g., 1 hour)</td>
+  </tr>
+  <tr>
+    <td><strong>Hybrid search + pre-filtering</strong></td>
+    <td>Add keyword pre-filter (date range, category) <em>before</em> the vector search so ANN scans a smaller index partition</td>
+    <td>30-50% faster retrieval on large indexes (&gt;1M docs)</td>
+    <td>Requires well-tagged metadata at ingestion time</td>
+  </tr>
+  <tr>
+    <td><strong>Reduce top-K</strong></td>
+    <td>Retrieve 3 chunks instead of 10; fewer chunks = shorter prompt = faster generation</td>
+    <td>~200-400ms off generation (fewer input tokens)</td>
+    <td>Risk of missing relevant context — validate with Recall@K on golden set</td>
+  </tr>
+  <tr>
+    <td><strong>Quantized / binary vectors</strong></td>
+    <td>Use scalar or binary quantization on stored embeddings — reduces memory and speeds ANN search</td>
+    <td>2-4x faster search with &lt;2% recall loss</td>
+    <td>Slight recall degradation — use oversampling + re-rank to compensate</td>
+  </tr>
+</table>
+
+<h2 id="lat-generation">14.2 Generation Layer</h2>
+
+<table>
+  <tr><th>Strategy</th><th>How It Works</th><th>Typical Savings</th><th>Trade-off</th></tr>
+  <tr>
+    <td><strong>Streaming (SSE)</strong></td>
+    <td>Stream tokens to the UI as they're generated — perceived latency drops to first-token time (~200ms)</td>
+    <td>Perceived wait goes from 3-5s to &lt;500ms</td>
+    <td>Total generation time unchanged — but UX feels instant</td>
+  </tr>
+  <tr>
+    <td><strong>Complexity-based model routing</strong></td>
+    <td>Route simple queries (greetings, FAQs) to a smaller/faster model (GPT-4o-mini); reserve GPT-4o for complex multi-hop</td>
+    <td>50-70% faster on simple queries (majority of traffic)</td>
+    <td>Needs a reliable complexity classifier — misrouting hurts quality</td>
+  </tr>
+  <tr>
+    <td><strong>Shorter system prompts</strong></td>
+    <td>Trim verbose instructions; every 1K tokens adds ~100ms</td>
+    <td>100-300ms per 1-3K tokens removed</td>
+    <td>Too short = less consistent output format</td>
+  </tr>
+  <tr>
+    <td><strong>Temperature 0</strong></td>
+    <td>Deterministic sampling skips the multinomial sampling step</td>
+    <td>Small but measurable (~50ms)</td>
+    <td>Less creative output — fine for factual RAG</td>
+  </tr>
+</table>
+
+<h2 id="lat-architecture">14.3 Architecture</h2>
+
+<table>
+  <tr><th>Strategy</th><th>How It Works</th><th>Typical Savings</th><th>Trade-off</th></tr>
+  <tr>
+    <td><strong>Parallel tool calls</strong></td>
+    <td>When the agent needs multiple tools (doc search + SQL + web), fire them concurrently instead of sequentially</td>
+    <td>Cuts multi-tool latency from sum to max (e.g., 3s → 1.2s)</td>
+    <td>Only works when tools are independent — dependent calls still sequential</td>
+  </tr>
+  <tr>
+    <td><strong>Async reflection</strong></td>
+    <td>Run the reflection/quality check <em>after</em> streaming the answer to the user, append a correction if needed</td>
+    <td>Removes reflection from the critical path (~1-2s)</td>
+    <td>User may briefly see an answer that gets corrected</td>
+  </tr>
+  <tr>
+    <td><strong>Connection pooling</strong></td>
+    <td>Reuse HTTP/gRPC connections to Azure OpenAI and AI Search — skip TLS handshake overhead</td>
+    <td>50-150ms per request</td>
+    <td>Minimal — standard best practice</td>
+  </tr>
+  <tr>
+    <td><strong>Regional co-location</strong></td>
+    <td>Deploy API, search index, and LLM endpoint in the same Azure region</td>
+    <td>20-80ms per cross-region hop eliminated</td>
+    <td>May limit model availability — check regional SKU support</td>
+  </tr>
+</table>
+
+<h2 id="lat-biggest-wins">14.4 Biggest Wins — Summary</h2>
+
+<table>
+  <tr><th>#</th><th>Strategy</th><th>Impact</th><th>Effort</th></tr>
+  <tr><td>1</td><td><strong>Semantic cache</strong></td><td>Eliminates round-trip on repeated queries</td><td>Medium (cache infra + TTL tuning)</td></tr>
+  <tr><td>2</td><td><strong>Streaming</strong></td><td>Perceived latency &lt;500ms</td><td>Low (SSE endpoint change)</td></tr>
+  <tr><td>3</td><td><strong>Complexity routing</strong></td><td>50-70% faster on simple queries</td><td>Medium (classifier + dual model config)</td></tr>
+  <tr><td>4</td><td><strong>Parallel tool calls</strong></td><td>Multi-tool time = max instead of sum</td><td>Low (Task.WhenAll / Promise.all)</td></tr>
+  <tr><td>5</td><td><strong>Reduce top-K + shorter prompts</strong></td><td>200-500ms off generation</td><td>Low (config change + golden set validation)</td></tr>
+</table>
+
+<div class="interview">
+  <strong>🎯 Interview Answer:</strong> "To reduce RAG latency I focus on three layers. <strong>Retrieval:</strong> semantic caching eliminates the round-trip entirely for repeated/similar queries — that's the single biggest win. I also use hybrid search with metadata pre-filters so the ANN scan hits a smaller partition. <strong>Generation:</strong> I stream tokens via SSE so the user sees the first token in ~200ms, and I route simple queries to GPT-4o-mini (50-70% faster) while reserving GPT-4o for complex multi-hop questions. <strong>Architecture:</strong> I fire independent tool calls in parallel (Task.WhenAll) so multi-tool latency is max-of-tools instead of sum-of-tools, and I run reflection asynchronously after the response streams — if it finds an issue, it appends a correction. Combined, these take a typical 8-second pipeline down to 1-2 seconds perceived latency."
+</div>
+
+<div class="callout">
+  <strong>Measurement tip:</strong> Track <strong>P50</strong> and <strong>P95</strong> latency separately. Averages hide tail latency. Set alerts on P95 &gt; 5s — that's your worst user experience. Break latency into segments (retrieval, generation, reflection) so you know which layer to optimize next.
+</div>
+
+</main>
+</div>
+
+<script>
+(function(){
+  window.addEventListener('scroll', function(){
+    var h = document.documentElement;
+    var pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+    document.getElementById('progress').style.width = pct + '%';
+  });
+  var links = document.querySelectorAll('.sidebar a[href^="#"]');
+  var sections = [];
+  links.forEach(function(a){
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if(el) sections.push({el:el, a:a});
+  });
+  function update(){
+    var scrollY = window.scrollY + 120;
+    var current = null;
+    sections.forEach(function(s){ if(s.el.offsetTop <= scrollY) current = s; });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(current) current.a.classList.add('active');
+  }
+  window.addEventListener('scroll', update);
+  update();
+})();
+</script>
+</body>
+</html>

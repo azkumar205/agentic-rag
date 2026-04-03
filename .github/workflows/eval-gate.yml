@@ -1,0 +1,38 @@
+name: PR Quality Gate (RAGAS)
+
+on:
+  pull_request:
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build API
+        run: dotnet build src/AgenticRAG.Api/AgenticRAG.Api.csproj
+      - name: Start API
+        run: |
+          dotnet run --project src/AgenticRAG.Api &
+          sleep 15
+        env:
+          AzureOpenAI__Endpoint: ${{ secrets.AOAI_ENDPOINT }}
+          AzureAISearch__Endpoint: ${{ secrets.SEARCH_ENDPOINT }}
+      - name: Install Python deps
+        run: pip install -r eval/requirements.txt
+      - name: Run RAGAS eval
+        run: python eval/run_eval.py
+        env:
+          API_URL: http://localhost:5000/api/agent/ask
+          GOLDEN_SET: eval/golden_test_set.json
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
+      - name: Fail if RAGAS fails
+        if: failure()
+        run: exit 1
