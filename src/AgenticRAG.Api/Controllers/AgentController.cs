@@ -21,6 +21,7 @@
 // =====================================================================================
 using AgenticRAG.Core.Agents;
 using AgenticRAG.Core.Models;
+using AgenticRAG.Core.Observability;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AgenticRAG.Api.Controllers;
@@ -81,5 +82,26 @@ public class AgentController : ControllerBase
                 }
             });
         }
+    }
+
+    // POST /api/agent/feedback — Record user thumbs up/down on an answer
+    // This is the GROUND TRUTH signal for evaluating answer quality.
+    // Metrics: positive/negative counters in Azure Monitor, correlated with reflection scores.
+    // No PII: only SessionId (ephemeral), boolean rating, and optional sanitized comment.
+    [HttpPost("feedback")]
+    public ActionResult Feedback([FromBody] FeedbackRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+            return BadRequest("SessionId is required.");
+
+        if (request.IsPositive)
+            AgenticRagMetrics.FeedbackPositive.Add(1);
+        else
+            AgenticRagMetrics.FeedbackNegative.Add(1);
+
+        _logger.LogInformation("Feedback received: {Rating} for session {SessionId}",
+            request.IsPositive ? "positive" : "negative", request.SessionId);
+
+        return Ok(new { accepted = true });
     }
 }

@@ -5,7 +5,8 @@
     "relevant_chunks": [
       "Section 12.1: Either party may terminate with 90 days written notice.",
       "Section 12.2: Notice must be delivered to the registered address."
-    ]
+    ],
+    "intent": "FactualLookup"
   },
   {
     "question": "List all invoice numbers for 2025.",
@@ -13,13 +14,70 @@
     "relevant_chunks": [
       "Invoice #2025-001: $1,200 paid.",
       "Invoice #2025-002: $2,400 pending."
-    ]
+    ],
+    "intent": "DataRetrieval"
   },
   {
     "question": "Who are the parties to the agreement?",
     "expected_answer": "Company A and Company B",
     "relevant_chunks": [
       "Section 1.1: This agreement is between Company A and Company B."
-    ]
+    ],
+    "intent": "FactualLookup"
+  },
+  {
+    "question": "Compare the payment terms of Company A vs Company B contracts.",
+    "expected_answer": "A side-by-side comparison of payment terms including net-30 vs net-60 differences, early payment discounts, and penalty clauses.",
+    "relevant_chunks": [
+      "Company A contract Section 5: Payment due within 30 days of invoice (net-30). Early payment discount of 2% if paid within 10 days.",
+      "Company B contract Section 7: Payment due within 60 days (net-60). Late payment penalty of 1.5% per month."
+    ],
+    "intent": "ComparisonAnalysis"
+  },
+  {
+    "question": "How do I set up a new vendor in the procurement system?",
+    "expected_answer": "Step-by-step process: 1) Submit vendor registration form, 2) Compliance review (3-5 days), 3) Finance creates vendor code, 4) Vendor activated in SAP.",
+    "relevant_chunks": [
+      "Procurement SOP Section 3.2: New vendor onboarding requires submission of registration form, W-9, and certificate of insurance.",
+      "Procurement SOP Section 3.3: Compliance review takes 3-5 business days. Upon approval, Finance assigns a vendor code in SAP."
+    ],
+    "intent": "ProceduralHowTo"
+  },
+  {
+    "question": "What was the total revenue for Q4 2024?",
+    "expected_answer": "The total revenue for Q4 2024 from SQL data.",
+    "relevant_chunks": [
+      "Q4 2024 revenue data from financial database"
+    ],
+    "intent": "DataRetrieval"
+  },
+  {
+    "question": "What's the weather like today?",
+    "expected_answer": "I don't have access to real-time weather data. I can help with questions about your documents, contracts, and business data.",
+    "relevant_chunks": [],
+    "intent": "GeneralChitchat"
+  },
+  {
+    "question": "Find the contract for the thing we discussed.",
+    "expected_answer": "Clarification request — the query is too ambiguous to retrieve a specific contract without more details.",
+    "relevant_chunks": [],
+    "intent": "Ambiguous"
+  },
+  {
+    "question": "What are the SLA guarantees for cloud hosting and how do they compare to on-premises uptime from the infrastructure report?",
+    "expected_answer": "Cloud SLA guarantees (99.95% for Azure, 99.99% for multi-region) compared to on-premises historical uptime from the infrastructure report.",
+    "relevant_chunks": [
+      "Cloud hosting SLA: 99.95% uptime for single-region, 99.99% for multi-region deployments.",
+      "Infrastructure Report 2024: On-premises uptime averaged 99.2% with 3 unplanned outages totaling 14 hours."
+    ],
+    "intent": "ComparisonAnalysis"
+  },
+  {
+    "question": "Show me all overdue invoices with amounts greater than $5000.",
+    "expected_answer": "List of overdue invoices exceeding $5,000 from the financial database.",
+    "relevant_chunks": [
+      "Overdue invoice data from accounts receivable table"
+    ],
+    "intent": "DataRetrieval"
   }
 ]

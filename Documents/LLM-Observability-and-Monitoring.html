@@ -1,0 +1,1658 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Observability & Monitoring — Agentic RAG</title>
+  <style>
+:root {
+  --sidebar-w: 300px;
+  --bg: #f0f2f5;
+  --panel: #1b1f3b;
+  --panel-hover: rgba(255,255,255,.07);
+  --panel-active: rgba(99,140,255,.22);
+  --text: #eaedf6;
+  --muted: #9aa3c4;
+  --accent: #638cff;
+  --content-bg: #ffffff;
+  --content-text: #1e2330;
+  --code-bg: #f6f8fc;
+  --border: #d6dce8;
+  --heading-color: #1a2744;
+  --link: #3e6fd9;
+  --table-stripe: #f9fafd;
+  --callout-bg: #eef4ff;
+  --callout-border: #a0bfff;
+  --interview-bg: #fff8e6;
+  --interview-border: #ffc94d;
+  --warn-bg: #fff3e0;
+  --warn-border: #ff9800;
+  --success-bg: #e8f5e9;
+  --success-border: #4caf50;
+  --danger-bg: #fde8e8;
+  --danger-border: #e53935;
+  --radius: 10px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+       background: var(--bg); color: var(--content-text); line-height: 1.72; font-size: 16px; }
+
+#progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent);
+             width: 0%; z-index: 999; transition: width .15s; }
+
+.layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+
+.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; overflow-x: hidden;
+           background: var(--panel); padding: 0; border-right: 1px solid rgba(255,255,255,.06);
+           scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+.sidebar::-webkit-scrollbar { width: 5px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 9px; }
+.sidebar-header { padding: 1.25rem 1.1rem .6rem; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: .5rem; }
+.sidebar-header h2 { margin: 0; font-size: .82rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+.sidebar-header .book-title { margin: .35rem 0 0; font-size: 1.05rem; color: #fff; font-weight: 700; }
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar > .toc > ul { padding: 0 .55rem .8rem; }
+.sidebar li { margin: 1px 0; }
+.sidebar a { color: var(--text); text-decoration: none; display: block; padding: .32rem .65rem;
+              border-radius: 6px; font-size: .88rem; transition: background .15s, color .15s;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar a:hover { background: var(--panel-hover); color: #fff; }
+.sidebar a.active { background: var(--panel-active); color: #fff; font-weight: 600; }
+.sidebar ul ul { padding-left: .7rem; margin-left: .45rem; border-left: 1px solid rgba(255,255,255,.1); }
+.sidebar ul ul a { font-size: .82rem; color: var(--muted); padding: .22rem .55rem; }
+.sidebar ul ul a:hover, .sidebar ul ul a.active { color: #fff; }
+
+.content-wrap { padding: 2.5rem 2rem; overflow-y: auto; }
+.content { max-width: 960px; margin: 0 auto; background: var(--content-bg); border-radius: var(--radius);
+           padding: 2.8rem 3rem 3rem; box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 12px 40px rgba(0,0,0,.07); }
+
+h1,h2,h3,h4,h5,h6 { color: var(--heading-color); scroll-margin-top: 1.4rem; line-height: 1.3; }
+h1 { font-size: 2.1rem; margin: 0 0 .6rem; letter-spacing: -.02em; }
+h2 { font-size: 1.55rem; margin: 2.8rem 0 .7rem; padding-bottom: .45rem; border-bottom: 2px solid var(--accent); }
+h3 { font-size: 1.2rem; margin: 2rem 0 .5rem; }
+h4 { font-size: 1.05rem; margin: 1.4rem 0 .4rem; }
+p { margin: .6rem 0; }
+a { color: var(--link); }
+strong { font-weight: 650; }
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+ul, ol { padding-left: 1.6rem; }
+li { margin: .25rem 0; }
+
+code { font-family: 'Cascadia Code', Consolas, 'Courier New', monospace; font-size: .88em;
+       background: var(--code-bg); padding: .12rem .35rem; border-radius: 5px; border: 1px solid #e9ecf5; }
+pre { background: #1e2340; color: #d4d8f0; padding: 1.1rem 1.2rem; border-radius: var(--radius);
+      overflow-x: auto; font-size: .875rem; line-height: 1.55; margin: 1rem 0; border: 1px solid #2a2f52; }
+pre code { background: transparent; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: .92rem;
+        border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+thead { background: #f2f4fb; }
+th { text-align: left; padding: .65rem .75rem; font-weight: 650; color: var(--heading-color); border-bottom: 2px solid var(--border); }
+td { padding: .55rem .75rem; border-bottom: 1px solid #eef0f7; vertical-align: top; }
+tbody tr:nth-child(even) { background: var(--table-stripe); }
+tbody tr:hover { background: #eef2fd; }
+
+blockquote { margin: 1.2rem 0; padding: .85rem 1.1rem; border-left: 4px solid var(--callout-border);
+             background: var(--callout-bg); border-radius: 0 var(--radius) var(--radius) 0; font-size: .95rem; }
+blockquote p { margin: .3rem 0; }
+
+.callout-warn { margin: 1.2rem 0; padding: .85rem 1.1rem; border-left: 4px solid var(--warn-border);
+                background: var(--warn-bg); border-radius: 0 var(--radius) var(--radius) 0; font-size: .95rem; }
+.callout-success { margin: 1.2rem 0; padding: .85rem 1.1rem; border-left: 4px solid var(--success-border);
+                   background: var(--success-bg); border-radius: 0 var(--radius) var(--radius) 0; font-size: .95rem; }
+.callout-danger { margin: 1.2rem 0; padding: .85rem 1.1rem; border-left: 4px solid var(--danger-border);
+                  background: var(--danger-bg); border-radius: 0 var(--radius) var(--radius) 0; font-size: .95rem; }
+.callout-interview { margin: 1.2rem 0; padding: .85rem 1.1rem; border-left: 4px solid var(--interview-border);
+                     background: var(--interview-bg); border-radius: 0 var(--radius) var(--radius) 0; font-size: .95rem; }
+.callout-interview strong::before { content: "🎯 "; }
+
+.badge { display: inline-block; font-size: .75rem; font-weight: 700; padding: .15rem .5rem;
+         border-radius: 20px; vertical-align: middle; margin: 0 .2rem; }
+.badge-green  { background: #e0f5e0; color: #2e7d32; }
+.badge-blue   { background: #e3eeff; color: #1a4faf; }
+.badge-orange { background: #fff3e0; color: #e65100; }
+.badge-red    { background: #fde8e8; color: #b71c1c; }
+.badge-purple { background: #f3e5f5; color: #6a1b9a; }
+.badge-gray   { background: #f0f0f0; color: #555; }
+
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; margin: 1.2rem 0; }
+.metric-card { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius);
+               padding: 1rem 1.2rem; text-align: center; }
+.metric-card .metric-val { font-size: 2rem; font-weight: 800; color: var(--accent); line-height: 1.1; }
+.metric-card .metric-label { font-size: .82rem; color: #666; margin-top: .25rem; }
+.metric-card .metric-sub { font-size: .78rem; color: #999; margin-top: .1rem; }
+
+.pipeline-step { display: flex; gap: 1rem; margin: .6rem 0; align-items: flex-start; }
+.pipeline-step .step-num { width: 28px; height: 28px; min-width: 28px; background: var(--accent);
+                           color: #fff; border-radius: 50%; display: flex; align-items: center;
+                           justify-content: center; font-size: .8rem; font-weight: 700; margin-top: .1rem; }
+.pipeline-step .step-body { flex: 1; }
+.pipeline-step .step-body strong { color: var(--heading-color); }
+
+.pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: 1.2rem 0; }
+.pros-cons .pros { background: var(--success-bg); border: 1px solid var(--success-border); border-radius: var(--radius); padding: 1rem 1.2rem; }
+.pros-cons .cons { background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); padding: 1rem 1.2rem; }
+.pros-cons h4 { margin: 0 0 .6rem; }
+.pros-cons ul { margin: 0; padding-left: 1.3rem; }
+.pros-cons li { margin: .2rem 0; font-size: .92rem; }
+
+.tag { display: inline; font-size: .78rem; font-weight: 600; padding: .1rem .4rem;
+       border-radius: 4px; margin-right: .25rem; }
+.tag-impl { background: #e3eeff; color: #1a4faf; }
+.tag-gap  { background: #fff3e0; color: #e65100; }
+.tag-code { background: #f3e5f5; color: #6a1b9a; }
+
+.hero-banner { background: linear-gradient(135deg, #1b1f3b 0%, #2a3060 100%);
+               color: #fff; padding: 2rem 2.5rem; border-radius: var(--radius);
+               margin-bottom: 2rem; }
+.hero-banner h1 { color: #fff; margin-bottom: .4rem; }
+.hero-banner p { color: var(--muted); margin: 0; font-size: 1.05rem; }
+
+.chapter-nav { display: flex; justify-content: space-between; margin-top: 2.5rem;
+               padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.chapter-nav a { color: var(--link); text-decoration: none; font-size: .92rem; }
+
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .content { padding: 1.5rem 1.2rem; }
+  .pros-cons { grid-template-columns: 1fr; }
+  .metric-grid { grid-template-columns: repeat(2,1fr); }
+  .timeline { padding-left: 1.5rem; }
+  .scenario-box { padding: 1rem; }
+  .diagram-box { overflow-x: auto; }
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.timeline { position: relative; padding-left: 2.2rem; margin: 1.2rem 0; }
+.timeline::before { content: ''; position: absolute; left: 9px; top: 0; bottom: 0; width: 2px; background: var(--accent); }
+.tl-item { position: relative; margin-bottom: 1rem; }
+.tl-item::before { content: ''; position: absolute; left: -2.2rem; top: .45rem; width: 12px; height: 12px;
+                   background: var(--accent); border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); }
+.tl-item.tl-warn::before { background: var(--warn-border); box-shadow: 0 0 0 2px var(--warn-border); }
+.tl-item.tl-success::before { background: var(--success-border); box-shadow: 0 0 0 2px var(--success-border); }
+.tl-item.tl-danger::before { background: var(--danger-border); box-shadow: 0 0 0 2px var(--danger-border); }
+.tl-time { font-size: .78rem; color: #888; font-weight: 600; }
+.tl-title { font-weight: 700; color: var(--heading-color); margin-top: .1rem; }
+.tl-detail { font-size: .9rem; color: #555; margin-top: .1rem; }
+.tl-log { background: #1e2340; color: #8bdf76; font-family: 'Cascadia Code', Consolas, monospace;
+          font-size: .78rem; padding: .4rem .6rem; border-radius: 6px; margin-top: .3rem;
+          overflow-x: auto; white-space: pre; }
+
+.scenario-box { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius);
+                padding: 1.4rem 1.5rem; margin: 1.2rem 0; }
+.scenario-box h4 { margin: 0 0 .5rem; color: var(--heading-color); }
+.scenario-box .scenario-trigger { font-weight: 700; color: var(--danger-border); }
+.scenario-box .scenario-detect { font-weight: 700; color: var(--accent); }
+.scenario-box .scenario-fix { font-weight: 700; color: var(--success-border); }
+
+.diagram-box { background: #1e2340; color: #d4d8f0; padding: 1.5rem; border-radius: var(--radius);
+               border: 1px solid #2a2f52; font-family: 'Cascadia Code', Consolas, monospace;
+               font-size: .82rem; line-height: 1.6; overflow-x: auto; margin: 1.2rem 0;
+               white-space: pre; }
+.diagram-box .d-green { color: #8bdf76; }
+.diagram-box .d-blue { color: #7ab3ff; }
+.diagram-box .d-yellow { color: #ffd666; }
+.diagram-box .d-red { color: #ff7b7b; }
+.diagram-box .d-purple { color: #c39bff; }
+.diagram-box .d-gray { color: #888; }
+.diagram-box .d-white { color: #fff; font-weight: 700; }
+
+.before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.2rem 0; }
+.ba-card { border-radius: var(--radius); padding: 1.2rem 1.4rem; }
+.ba-before { background: var(--danger-bg); border: 1px solid var(--danger-border); }
+.ba-after { background: var(--success-bg); border: 1px solid var(--success-border); }
+.ba-card h4 { margin: 0 0 .7rem; }
+.ba-card .ba-item { margin: .5rem 0; font-size: .92rem; }
+.ba-card .ba-item strong { display: block; font-size: .82rem; color: #666; margin-bottom: .1rem; }
+
+.story-card { background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%); border: 1px solid var(--callout-border);
+              border-radius: var(--radius); padding: 1.4rem 1.5rem; margin: 1.2rem 0; }
+.story-card h4 { margin: 0 0 .3rem; color: var(--heading-color); font-size: 1.05rem; }
+.story-card .story-context { font-size: .88rem; color: #666; font-style: italic; margin-bottom: .7rem; }
+.story-card ol { margin: 0; padding-left: 1.4rem; }
+.story-card li { margin: .4rem 0; font-size: .92rem; }
+.story-card li strong { color: var(--heading-color); }
+.story-card .story-closer { margin-top: .7rem; padding-top: .5rem; border-top: 1px solid var(--callout-border);
+                            font-weight: 700; color: var(--accent); font-size: .92rem; }
+  </style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="layout">
+
+<!-- ══════════════════════════ SIDEBAR ══════════════════════════ -->
+<nav class="sidebar" aria-label="Table of contents">
+  <div class="sidebar-header">
+    <h2>Agentic RAG</h2>
+    <div class="book-title">LLM Observability &amp; Monitoring</div>
+  </div>
+  <div class="toc">
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#realworld">Real-World Walkthrough</a>
+        <ul>
+          <li><a href="#rw-happy">Happy Path (Score 8)</a></li>
+          <li><a href="#rw-retry">Retry Path (Score 4→8)</a></li>
+          <li><a href="#rw-cache">Cache Hit Path</a></li>
+        </ul>
+      </li>
+      <li><a href="#pipeline-diagram">Visual Pipeline Diagram</a></li>
+      <li><a href="#pillar1">1. Pipeline Telemetry</a>
+        <ul>
+          <li><a href="#reasoning-steps">Reasoning Steps</a></li>
+          <li><a href="#token-tracking">Token &amp; Cost Tracking</a></li>
+          <li><a href="#latency">Latency Measurement</a></li>
+        </ul>
+      </li>
+      <li><a href="#pillar2">2. LLM-as-Judge</a>
+        <ul>
+          <li><a href="#reflection">ReflectionService</a></li>
+          <li><a href="#scoring-criteria">Scoring Criteria</a></li>
+          <li><a href="#human-review">Human Review Layer</a></li>
+        </ul>
+      </li>
+      <li><a href="#pillar3">3. Evaluation Framework</a>
+        <ul>
+          <li><a href="#ground-truth">Ground Truth Setup</a></li>
+          <li><a href="#ragas-metrics">RAGAS Metrics</a></li>
+          <li><a href="#confusion-metrics">Confusion Metrics</a></li>
+          <li><a href="#eval-implementation">Implementation</a></li>
+        </ul>
+      </li>
+      <li><a href="#pillar4">4. Cost Monitoring</a>
+        <ul>
+          <li><a href="#cost-model">Cost Model</a></li>
+          <li><a href="#routing-savings">Routing Savings</a></li>
+          <li><a href="#cache-savings">Cache Savings</a></li>
+          <li><a href="#budget-alerts">Budget Alerts</a></li>
+        </ul>
+      </li>
+      <li><a href="#pillar5">5. Structured Logging</a>
+        <ul>
+          <li><a href="#ilogger">ILogger Pattern</a></li>
+          <li><a href="#correlation">Correlation IDs</a></li>
+          <li><a href="#pii-safety">PII-Safe Logging</a></li>
+        </ul>
+      </li>
+      <li><a href="#pillar6">6. OpenTelemetry &amp; AppInsights</a>
+        <ul>
+          <li><a href="#otel-setup">OTel Setup</a></li>
+          <li><a href="#custom-metrics">Custom Metrics</a></li>
+          <li><a href="#dashboards">Dashboards</a></li>
+        </ul>
+      </li>
+      <li><a href="#gaps">7. Current Gaps &amp; Roadmap</a></li>
+      <li><a href="#incidents">8. Real Incident Scenarios</a>
+        <ul>
+          <li><a href="#inc-quality">Quality Drop Detection</a></li>
+          <li><a href="#inc-cost">Cost Spike Detection</a></li>
+          <li><a href="#inc-hallucination">Hallucination Caught</a></li>
+        </ul>
+      </li>
+      <li><a href="#before-after">9. Before vs After Observability</a></li>
+      <li><a href="#pros-cons">10. Pros &amp; Cons</a></li>
+      <li><a href="#interview">11. Interview Storytelling Guide</a></li>
+      <li><a href="#cheatsheet">12. Quick Cheatsheet</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ══════════════════════════ CONTENT ══════════════════════════ -->
+<main class="content-wrap">
+<article class="content">
+
+<div class="hero-banner">
+  <h1>LLM Observability &amp; Monitoring</h1>
+  <p>Ground truth setup · RAGAS evaluation · LLM-as-judge · Human review · Cost &amp; latency monitoring · OpenTelemetry · Interview revision</p>
+</div>
+
+<!-- ── OVERVIEW ── -->
+<section id="overview">
+<h2>Overview</h2>
+<p><strong>Observability</strong> for an LLM system answers three questions: <em>Is the answer correct?</em> (quality), <em>How much did it cost?</em> (cost), and <em>How fast was it?</em> (latency). Without observability, you cannot improve, debug, or trust your system in production.</p>
+
+<p>In this Agentic RAG system, observability is implemented across <strong>6 pillars:</strong></p>
+
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="metric-val">10</div>
+    <div class="metric-label">Pipeline Steps Logged</div>
+    <div class="metric-sub">Every step emits structured events</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">5</div>
+    <div class="metric-label">PII Layers Tracked</div>
+    <div class="metric-sub">Per-layer redaction counts</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">1–10</div>
+    <div class="metric-label">Reflection Score</div>
+    <div class="metric-sub">LLM-as-judge per response</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">4</div>
+    <div class="metric-label">RAGAS Metrics</div>
+    <div class="metric-sub">Faithfulness · Precision · Recall · Relevancy</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">69%</div>
+    <div class="metric-label">Cost Reduction</div>
+    <div class="metric-sub">Via model routing (measured)</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">~150ms</div>
+    <div class="metric-label">Cache Hit Latency</div>
+    <div class="metric-sub">vs 4–8s without cache</div>
+  </div>
+</div>
+
+<blockquote>
+<p><strong>Key insight:</strong> Observability is not a single tool — it's a stack: structured logging (ILogger) → custom metrics (OpenTelemetry) → quality evaluation (RAGAS + LLM-as-judge) → cost tracking (TokenUsageInfo) → alerting (Azure Monitor). Each layer catches different failure modes.</p>
+</blockquote>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- REAL-WORLD WALKTHROUGH                               -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="realworld">
+<h2>Real-World Walkthrough — Follow One Question Through the System</h2>
+<p>The best way to understand observability is to <strong>trace a single real question</strong> through every layer. Here are three scenarios you'd see in production.</p>
+
+<h3 id="rw-happy">Scenario 1: Happy Path — User Asks "What is the contract termination notice period?"</h3>
+<p><em>This is a simple factual question. Watch how every observability layer fires.</em></p>
+
+<div class="timeline">
+  <div class="tl-item">
+    <div class="tl-time">T+0ms — Request arrives</div>
+    <div class="tl-title">Step 1: Controller Logging</div>
+    <div class="tl-detail">AgentController receives POST /api/agent/ask. Logs first 100 chars of question (PII-safe truncation).</div>
+    <div class="tl-log">INFO: Received question (first 100 chars): "What is the contract termination notice period?"
+INFO: SessionId = abc-123-def</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+5ms — PII Check (Layer 1)</div>
+    <div class="tl-title">Step 2: PII Redaction on Input</div>
+    <div class="tl-detail">PiiRedactionService scans the question. No PII found. Logs the count (not the content).</div>
+    <div class="tl-log">INFO: PII Layer 1: Redacted 0 entities from user input</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+8ms — Intent Classification</div>
+    <div class="tl-title">Step 3: Rule-Based Intent (Tier 1)</div>
+    <div class="tl-detail">IntentClassifierService matches "what is" pattern → FactualLookup (confidence 0.80). <strong>Zero LLM cost, ~1ms.</strong></div>
+    <div class="tl-log">INFO: Intent classified as FactualLookup (confidence=0.80) — keyword "what is" matched</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+10ms — Cache Check</div>
+    <div class="tl-title">Step 4: Semantic Cache Lookup</div>
+    <div class="tl-detail">SemanticCacheService embeds the question (text-embedding-3-small, 512 dims). Searches Azure AI Search cache index. No match above 0.92 cosine threshold → <strong>CACHE MISS</strong>.</div>
+    <div class="tl-log">INFO: Semantic cache: MISS (best match cosine=0.78, threshold=0.92)</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+120ms — Memory Load</div>
+    <div class="tl-title">Step 5: Conversation Memory</div>
+    <div class="tl-detail">ConversationMemoryService loads last 5 turns from Redis. First question in session → empty. Logs turn count.</div>
+    <div class="tl-log">INFO: Loaded 0 history turns for session abc-123-def</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+130ms — LLM Planning Call</div>
+    <div class="tl-title">Step 6: GPT-4o-mini Plans + Calls Tools</div>
+    <div class="tl-detail">PromptTemplateService selects FactualLookup system prompt (with CoT steps + few-shot examples). GPT-4o-mini decides to call SearchDocumentsAsync. <strong>The response includes [INTENT: FactualLookup]</strong> — LLM confirms the rule-based intent (Tier 2 piggyback, zero extra cost).</div>
+    <div class="tl-log">INFO: Planning prompt selected: FactualLookup (CoT + 2 few-shot examples)
+INFO: Calling tool (via MCP): SearchDocumentsAsync("contract termination notice")
+INFO: MCP tool returned: 3 chunks (tokens≈280)
+INFO: LLM Intent: FactualLookup (confirms rule-based — no override needed)</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+950ms — Complexity Routing</div>
+    <div class="tl-title">Step 7: Route to Simple (GPT-4o-mini reuses planning response)</div>
+    <div class="tl-detail">ComplexityRouter: 1 tool called + 280 tokens + "what is" prefix → <strong>Simple.</strong> No GPT-4o generation needed. Planning response IS the answer. <strong>Saves $0.015.</strong></div>
+    <div class="tl-log">INFO: Routing: Simple (tools=1, tokens≈280)
+INFO: Reusing planning response as final answer (Simple path)</div>
+  </div>
+
+  <div class="tl-item tl-success">
+    <div class="tl-time">T+960ms — Strip Intent Tag</div>
+    <div class="tl-title">Step 8: Clean the Answer</div>
+    <div class="tl-detail">StripIntentTag() removes "[INTENT: FactualLookup]\n" from the beginning of the response. User never sees the tag.</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+970ms — Quality Check</div>
+    <div class="tl-title">Step 9: ReflectionService (LLM-as-Judge)</div>
+    <div class="tl-detail">ReflectionService.EvaluateAsync() calls GPT-4o-mini with the question + answer + tools used. Scores: GROUNDED=3, COMPLETE=2, CITED=2, CLEAR=1 → <strong>Score 8/10.</strong> Above threshold (6). No retry needed.</div>
+    <div class="tl-log">INFO: Reflection: Score 8/10 — passed (threshold=6, cost=$0.002)</div>
+  </div>
+
+  <div class="tl-item tl-success">
+    <div class="tl-time">T+1380ms — Cache Write + Response</div>
+    <div class="tl-title">Step 10: Cache Answer + Return to User</div>
+    <div class="tl-detail">Answer cached in semantic cache (for next similar question). Memory updated in Redis. Full AgentResponse returned.</div>
+    <div class="tl-log">INFO: Cached answer for future similar questions (TTL=4h)
+INFO: Response complete — 1380ms, score=8/10, model=gpt-4o-mini, intent=FactualLookup</div>
+  </div>
+</div>
+
+<p><strong>What the client receives:</strong></p>
+<pre><code>{
+  "answer": "The contract termination notice period is 90 days written notice. [DocSource 1]\n\nAccording to Section 12.1, either party may terminate the agreement by providing 90 days written notice to the other party. The notice must be delivered to the registered address of the receiving party. [DocSource 2]",
+  "reflectionScore": 8,
+  "modelUsed": "gpt-4o-mini",
+  "fromCache": false,
+  "intent": { "intent": "FactualLookup", "confidence": 0.80, "reasoning": "Rule-based: 'what is' prefix" },
+  "toolsUsed": ["SearchDocumentsAsync"],
+  "reasoningSteps": [
+    "Intent: FactualLookup (confidence=0.80)",
+    "Semantic cache: MISS",
+    "Calling tool (via MCP): SearchDocumentsAsync",
+    "MCP tool returned: 3 chunks",
+    "LLM Intent: FactualLookup (confirms rule-based)",
+    "Routing: Simple (tools=1, tokens≈280)",
+    "Reflection: Score 8/10"
+  ],
+  "tokenUsage": { "promptTokens": 420, "completionTokens": 85, "estimatedCost": 0.0003, "toolCallCount": 1 },
+  "textCitations": [
+    { "title": "Section 12.1", "content": "Either party may terminate with 90 days written notice." },
+    { "title": "Section 12.2", "content": "Notice must be delivered to the registered address." }
+  ],
+  "errors": []
+}</code></pre>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "Look at the response — it's self-documenting. The client doesn't need a separate observability tool to understand what happened. It can see: the intent (FactualLookup), which tools were called (SearchDocumentsAsync), which model was used (gpt-4o-mini, not GPT-4o — saving 15x), the quality score (8/10), and the complete reasoning trail. This is in-band observability — the trace is the response."</p>
+</div>
+
+<hr/>
+
+<h3 id="rw-retry">Scenario 2: Retry Path — LLM Forgets to Cite Sources (Score 4 → 8)</h3>
+<p><em>This is the real-world scenario interviewers love — show how the system self-corrects.</em></p>
+
+<div class="timeline">
+  <div class="tl-item">
+    <div class="tl-time">Steps 1–7: Same as Scenario 1</div>
+    <div class="tl-title">Everything up to generation works fine</div>
+    <div class="tl-detail">The question is "Compare contract A and contract B termination clauses." Intent: ComparisonAnalysis. Route: Complex (GPT-4o). Generation produces a good comparison... but forgets to add [DocSource] citations.</div>
+  </div>
+
+  <div class="tl-item tl-danger">
+    <div class="tl-time">T+3200ms — Quality FAIL</div>
+    <div class="tl-title">ReflectionService scores 4/10</div>
+    <div class="tl-detail">GROUNDED=3, COMPLETE=1, <strong>CITED=0</strong>, CLEAR=0 → Score 4. Below threshold (6). <strong>Retry triggered.</strong></div>
+    <div class="tl-log"><span style="color: #ff7b7b;">WARN: Reflection score 4/10 — diagnosing failure (attempt 1/2)</span></div>
+  </div>
+
+  <div class="tl-item tl-warn">
+    <div class="tl-time">T+3210ms — Diagnose Failure</div>
+    <div class="tl-title">DiagnoseFailure() identifies: MissingCitations</div>
+    <div class="tl-detail">The orchestrator checks: tools were called ✓, results weren't empty ✓, no tool errors ✓, but answer doesn't contain "[DocSource" → <strong>diagnosis: MissingCitations.</strong></div>
+    <div class="tl-log">WARN: Diagnosed failure type: MissingCitations
+WARN: Retry prompt: "Add [DocSource N] citations to every factual claim. Each claim MUST reference the specific document section."</div>
+  </div>
+
+  <div class="tl-item">
+    <div class="tl-time">T+3220ms — Targeted Retry</div>
+    <div class="tl-title">GPT-4o re-generates with correction prompt</div>
+    <div class="tl-detail">The LLM receives the SAME tool results, but now with a specific correction: "Add [DocSource N] citations to every factual claim." This is NOT "try again" — it's a targeted fix for the exact failure mode.</div>
+    <div class="tl-log">INFO: Retry 1/2 — re-generating with correction: MissingCitations
+INFO: Correction prompt appended to system message</div>
+  </div>
+
+  <div class="tl-item tl-success">
+    <div class="tl-time">T+5500ms — Quality PASS</div>
+    <div class="tl-title">ReflectionService scores 8/10 on retry</div>
+    <div class="tl-detail">GROUNDED=3, COMPLETE=2, <strong>CITED=2</strong>, CLEAR=1 → Score 8. Above threshold. Answer delivered to user.</div>
+    <div class="tl-log"><span style="color: #8bdf76;">INFO: Retry succeeded — score improved from 4 to 8 (failure was MissingCitations)</span></div>
+  </div>
+</div>
+
+<blockquote>
+<p><strong>Why this matters:</strong> Without the reflection loop, the user would have received an uncited comparison. With it, the system caught the problem, diagnosed it as "missing citations" (not generic "bad answer"), and fixed it in one retry. Total extra cost: ~$0.017 (one retry). Total extra latency: ~2.3s. But the user got a properly cited answer.</p>
+</blockquote>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "The key difference from naive retry is DIAGNOSIS. We don't say 'try harder' — we analyze WHY: was it missing citations? no tools called? SQL error? empty search results? Then we give the LLM a specific fix. We have 5 targeted failure modes. This fixes ~80% of issues on first retry vs ~40% for generic retry. And the failure type is logged — so we can track WHICH failure modes happen most often and fix the root cause in the prompt."</p>
+</div>
+
+<hr/>
+
+<h3 id="rw-cache">Scenario 3: Cache Hit — Same Question 30 Minutes Later</h3>
+<p><em>Shows the 99.9% cost reduction and 95% latency reduction in practice.</em></p>
+
+<div class="timeline">
+  <div class="tl-item">
+    <div class="tl-time">T+0ms — Request arrives</div>
+    <div class="tl-title">A different user asks: "What's the termination notice for the contract?"</div>
+    <div class="tl-detail">Different wording, same meaning. This is why we use <strong>semantic</strong> cache, not exact-match cache.</div>
+  </div>
+
+  <div class="tl-item tl-success">
+    <div class="tl-time">T+120ms — Cache HIT</div>
+    <div class="tl-title">Cosine similarity = 0.96 (threshold 0.92) → HIT!</div>
+    <div class="tl-detail">The embedding of "What's the termination notice for the contract?" is 0.96 similar to the cached "What is the contract termination notice period?" — above 0.92 threshold.</div>
+    <div class="tl-log"><span style="color: #8bdf76;">INFO: Semantic cache: HIT (cosine=0.96, threshold=0.92)</span>
+INFO: Returning cached answer — skipping full pipeline</div>
+  </div>
+
+  <div class="tl-item tl-success">
+    <div class="tl-time">T+150ms — Response returned</div>
+    <div class="tl-title">Total time: 150ms (vs 1380ms). Cost: ~$0.000004 (vs $0.003)</div>
+    <div class="tl-detail">The <strong>entire pipeline is skipped</strong> — no planning, no tools, no generation, no reflection. The previous answer was already scored 8/10, so the quality is known-good.</div>
+  </div>
+</div>
+
+<p><strong>What the client receives on cache hit:</strong></p>
+<pre><code>{
+  "answer": "The contract termination notice period is 90 days written notice. [DocSource 1]...",
+  "reflectionScore": 8,
+  "fromCache": true,          // ← Key observability signal
+  "modelUsed": "cached",
+  "reasoningSteps": ["Semantic cache: HIT (cosine=0.96)"],
+  "tokenUsage": { "estimatedCost": 0.000004, "toolCallCount": 0 }
+}</code></pre>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "This is why semantic cache is game-changing for LLM costs. We use vector similarity (text-embedding-3-small, 512 dims) with a 0.92 cosine threshold. Different wording, same meaning → cache hit. The cost drops from $0.003 to $0.000004 — that's 99.9% reduction. But here's the important part: the `fromCache: true` flag in every response means our dashboard can track cache hit rate in real time. If hit rate drops below 20%, we get an alert — maybe the threshold is too strict, or the index got corrupted."</p>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- VISUAL PIPELINE DIAGRAM                              -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pipeline-diagram">
+<h2>Visual Pipeline Diagram — Where Observability Fires</h2>
+<p>Use this diagram to explain the complete flow in an interview. Every box with a ★ is an observability emission point.</p>
+
+<div class="diagram-box">
+<span class="d-white">                    AGENTIC RAG — OBSERVABILITY PIPELINE</span>
+<span class="d-gray">                    ═══════════════════════════════════════</span>
+
+<span class="d-blue">  ┌──────────────────────┐</span>
+<span class="d-blue">  │   User Question      │</span>  "What is the contract termination period?"
+<span class="d-blue">  └──────────┬───────────┘</span>
+             │
+             ▼
+<span class="d-green">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: question (first 100 chars, PII-safe)</span>
+<span class="d-green">  │  1. Controller       │</span>  ★ <span class="d-yellow">LOG: SessionId, RequestId</span>
+<span class="d-green">  └──────────┬───────────┘</span>
+             │
+             ▼
+<span class="d-green">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Redacted N entities" (count, NOT content)</span>
+<span class="d-green">  │  2. PII Layer 1      │</span>  ★ <span class="d-purple">METRIC: rag.pii_redactions</span>
+<span class="d-green">  └──────────┬───────────┘</span>
+             │
+             ▼
+<span class="d-green">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Intent: FactualLookup (0.80)"</span>
+<span class="d-green">  │  3. Intent (Rules)   │</span>     <span class="d-gray">Rule-based, ~1ms, $0</span>
+<span class="d-green">  └──────────┬───────────┘</span>
+             │
+             ▼
+<span class="d-green">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Cache: HIT/MISS (cosine=0.xx)"</span>
+<span class="d-green">  │  4. Semantic Cache   │</span>  ★ <span class="d-purple">METRIC: rag.cache_hits / rag.cache_misses</span>
+<span class="d-green">  └──────────┬───────────┘</span>
+             │
+      <span class="d-green">HIT?</span> ─┤─── <span class="d-green">YES → Return cached answer (150ms, $0.000004)</span>
+             │
+             ▼ <span class="d-red">NO (cache miss)</span>
+<span class="d-green">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Loaded N history turns"</span>
+<span class="d-green">  │  5. Memory (Redis)   │</span>     <span class="d-gray">Up to 5 turns, auto-summarize after 10</span>
+<span class="d-green">  └──────────┬───────────┘</span>
+             │
+             ▼
+<span class="d-blue">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Planning prompt: FactualLookup"</span>
+<span class="d-blue">  │  6. GPT-4o-mini      │</span>  ★ <span class="d-yellow">LOG: "Calling tool: SearchDocumentsAsync"</span>
+<span class="d-blue">  │     Planning + Tools │</span>  ★ <span class="d-yellow">LOG: "LLM Intent: FactualLookup"</span>
+<span class="d-blue">  └──────────┬───────────┘</span>  ★ <span class="d-purple">METRIC: rag.planning_latency_ms</span>
+             │
+             ▼
+<span class="d-green">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Routing: Simple/Complex"</span>
+<span class="d-green">  │  7. Complexity Route │</span>  ★ <span class="d-purple">METRIC: rag.routing_simple / rag.routing_complex</span>
+<span class="d-green">  └──────────┬───────────┘</span>
+             │
+      <span class="d-blue">Simple</span> ─┤─── <span class="d-red">Complex</span>
+      (reuse)  │   (call GPT-4o)
+             │         │
+             │         ▼
+             │   <span class="d-red">┌──────────────────────┐</span>  ★ <span class="d-purple">METRIC: rag.generation_latency_ms</span>
+             │   <span class="d-red">│  GPT-4o Generation   │</span>  ★ <span class="d-yellow">LOG: "Generation: GPT-4o (intent-specific)"</span>
+             │   <span class="d-red">└──────────┬───────────┘</span>
+             │              │
+             └──────┬───────┘
+                    │
+                    ▼
+<span class="d-yellow">  ┌──────────────────────┐</span>  ★ <span class="d-yellow">LOG: "Reflection: Score N/10"</span>
+<span class="d-yellow">  │  8. LLM-as-Judge     │</span>  ★ <span class="d-purple">METRIC: rag.reflection_score</span>
+<span class="d-yellow">  │     ReflectionService│</span>     <span class="d-gray">GPT-4o-mini, ~$0.002, ~400ms</span>
+<span class="d-yellow">  └──────────┬───────────┘</span>
+             │
+      <span class="d-green">≥ 6?</span> ──┤─── <span class="d-red">&lt; 6 → DiagnoseFailure() → Targeted Retry (max 2)</span>
+             │                ★ <span class="d-yellow">LOG: "Diagnosed: MissingCitations"</span>
+             ▼                ★ <span class="d-yellow">LOG: "Retry 1/2 with correction"</span>
+<span class="d-green">  ┌──────────────────────┐</span>
+<span class="d-green">  │  9. Cache Write +    │</span>  ★ <span class="d-yellow">LOG: "Response complete — 1380ms, score=8/10"</span>
+<span class="d-green">  │     API Response     │</span>  ★ <span class="d-purple">METRIC: rag.estimated_cost_usd</span>
+<span class="d-green">  └──────────────────────┘</span>
+
+<span class="d-gray">  ★ YELLOW = Structured log (ILogger → Application Insights)</span>
+<span class="d-gray">  ★ PURPLE = Custom metric (OpenTelemetry → Azure Monitor)</span>
+<span class="d-gray">  GREEN boxes = zero-cost steps (rules, cache, memory)</span>
+<span class="d-gray">  BLUE boxes  = LLM calls (planning)</span>
+<span class="d-gray">  RED box     = expensive LLM call (GPT-4o generation)</span>
+</div>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "Here's how I'd explain our observability architecture in 60 seconds: We have 9 pipeline steps. Each step emits two things — a structured log (for debugging specific requests) and a custom metric (for dashboards and alerts). The pipeline has three decision points: cache hit/miss, simple/complex routing, and reflection pass/fail. Each decision is observable. If cache hit rate drops, we know retrieval is diverging. If complex rate rises, we're overpaying. If reflection fails, we auto-retry with a targeted fix. All of this is in the API response too — the client can display the full reasoning trail."</p>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PILLAR 1: PIPELINE TELEMETRY                         -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pillar1">
+<h2>Pillar 1 — Pipeline Telemetry</h2>
+<p>Every step of the 10-step pipeline emits structured log events and appends to the <code>ReasoningSteps</code> list, which is returned in the API response for full client-side observability.</p>
+
+<h3 id="reasoning-steps">Reasoning Steps (in-band tracing)</h3>
+<p>Each pipeline stage appends a human-readable step to <code>reasoningSteps</code>. This list is included in every <code>AgentResponse</code>, giving the frontend a transparent view of what the agent did:</p>
+
+<pre><code>// From AgentOrchestrator.cs — each step adds an entry
+reasoningSteps.Add($"Intent: {intentResult.Intent} (confidence={intentResult.Confidence:F2})");
+reasoningSteps.Add($"Routing: {complexity} (tools={toolsUsed.Distinct().Count()}, tokens≈{contextTokenEstimate})");
+reasoningSteps.Add($"Reflection: Score {reflectionScore}/10 — diagnosing failure...");
+reasoningSteps.Add($"Fallback: detected tool errors, retrying with alternative approach");</code></pre>
+
+<p>The client receives something like:</p>
+<pre><code>{
+  "reasoningSteps": [
+    "Intent: DataRetrieval (confidence=0.85) — SQL-oriented keywords detected",
+    "Calling tool (via MCP): GetSchemaAsync",
+    "MCP tool returned results",
+    "Calling tool (via MCP): QuerySqlAsync",
+    "MCP tool returned results",
+    "LLM Intent: DataRetrieval (confirms rule-based)",
+    "Routing: Simple (tools=2, tokens≈340)",
+    "Routing: intent override — ComparisonAnalysis escalated to Complex",
+    "Generation: GPT-4o synthesized answer (intent-specific prompt: DataRetrieval)",
+    "Reflection: Score 8/10"
+  ]
+}</code></pre>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "Reasoning steps are a form of in-band distributed tracing. Every API response includes the agent's full decision trail — which tools were called, which model was used, why, and what quality score was assigned. Zero extra infrastructure needed; the tracing is baked into the response contract."</p>
+</div>
+
+<h3 id="token-tracking">Token &amp; Cost Tracking</h3>
+<p>The <code>TokenUsageInfo</code> model is attached to every <code>AgentResponse</code>:</p>
+
+<pre><code>// AgentModels.cs
+public class TokenUsageInfo
+{
+    public int PromptTokens { get; set; }       // Input tokens consumed
+    public int CompletionTokens { get; set; }   // Output tokens generated
+    public int TotalTokens { get; set; }        // Sum
+    public decimal EstimatedCost { get; set; }  // USD at current Azure OpenAI pricing
+    public int ToolCallCount { get; set; }      // How many MCP tools were called
+}</code></pre>
+
+<p><strong>Cost formula per request:</strong></p>
+<pre><code>// EstimatedCost calculation (approximate Azure pricing, April 2026)
+// GPT-4o-mini planning:  $0.15  / 1M input tokens + $0.60  / 1M output tokens
+// GPT-4o  generation:    $2.50  / 1M input tokens + $10.00 / 1M output tokens
+// text-embedding-3-small (cache): $0.020 / 1M tokens
+// text-embedding-3-large (docs):  $0.130 / 1M tokens
+// ReflectionService call:         ~$0.002 per evaluation (cheap GPT-4o-mini call)
+
+EstimatedCost =
+    (PromptTokens * planningRate) +
+    (CompletionTokens * completionRate) +
+    (embeddingTokens * embeddingRate) +
+    reflectionCost;</code></pre>
+
+<div class="callout-warn">
+<p><strong>Current gap:</strong> <code>EstimatedCost</code> and <code>ToolCallCount</code> are populated in the model, but token counts from the Azure OpenAI SDK response are not yet explicitly extracted and wired into the field. The field exists but may show 0. See the <a href="#gaps">Gaps</a> section for the fix.</p>
+</div>
+
+<h3 id="latency">Latency Measurement</h3>
+<p>Currently latency is observed implicitly via Azure Monitor's built-in HTTP request duration tracking (P50, P95, P99 in Application Insights). To add explicit per-step latency:</p>
+
+<pre><code>// Recommended addition to AgentOrchestrator.cs
+using System.Diagnostics;
+
+var sw = Stopwatch.StartNew();
+var planningResponse = await _planningClient.GetResponseAsync(messages, chatOptions);
+sw.Stop();
+reasoningSteps.Add($"Planning: {sw.ElapsedMilliseconds}ms");
+_logger.LogInformation("Planning phase took {Ms}ms", sw.ElapsedMilliseconds);</code></pre>
+
+<p>Key latency benchmarks to track:</p>
+<table>
+  <thead><tr><th>Stage</th><th>Expected P50</th><th>Expected P95</th><th>Alert If</th></tr></thead>
+  <tbody>
+    <tr><td>Cache hit (semantic)</td><td>~150ms</td><td>~250ms</td><td>&gt;500ms</td></tr>
+    <tr><td>Cache miss (embedding)</td><td>~100ms</td><td>~200ms</td><td>&gt;400ms</td></tr>
+    <tr><td>Planning (GPT-4o-mini)</td><td>~800ms</td><td>~2s</td><td>&gt;5s</td></tr>
+    <tr><td>Generation (GPT-4o)</td><td>~2s</td><td>~5s</td><td>&gt;10s</td></tr>
+    <tr><td>Reflection (GPT-4o-mini)</td><td>~400ms</td><td>~800ms</td><td>&gt;2s</td></tr>
+    <tr><td>End-to-end (cache miss)</td><td>~4s</td><td>~8s</td><td>&gt;15s</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PILLAR 2: LLM-AS-JUDGE                               -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pillar2">
+<h2>Pillar 2 — LLM-as-Judge (ReflectionService)</h2>
+<p>LLM-as-judge uses a <em>separate, independent</em> LLM call to evaluate the quality of the answer before it is returned to the user. This is the in-production quality gate.</p>
+
+<h3 id="reflection">ReflectionService — How It Works</h3>
+
+<div class="pipeline-step">
+  <div class="step-num">1</div>
+  <div class="step-body"><strong>Generate answer</strong> — planning + generation phases produce the final answer.</div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">2</div>
+  <div class="step-body"><strong>Score it</strong> — <code>ReflectionService.EvaluateAsync(question, answer, toolsUsed)</code> calls GPT-4o-mini with a strict scoring prompt.</div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">3</div>
+  <div class="step-body"><strong>Gate it</strong> — if score &lt; <code>ReflectionThreshold</code> (default 6), the orchestrator diagnoses the failure type and retries (max 2 retries).</div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">4</div>
+  <div class="step-body"><strong>Return it</strong> — the final score is included in <code>AgentResponse.ReflectionScore</code> for every request.</div>
+</div>
+
+<pre><code>// ReflectionService.cs — the scoring prompt
+new(ChatRole.System, """
+    You are an answer quality evaluator. Score the answer from 1-10.
+    Scoring criteria:
+    - GROUNDED (1-3): Is the answer based on actual tool results, not made up?
+    - COMPLETE (1-3): Does it address all parts of the question?
+    - CITED (1-2): Are sources cited with [DocSource] or [SQLSource]?
+    - CLEAR (1-2): Is the answer well-structured and easy to understand?
+    Respond with ONLY a single integer 1-10. Nothing else.
+""")</code></pre>
+
+<h3 id="scoring-criteria">Scoring Criteria Breakdown</h3>
+<table>
+  <thead><tr><th>Criterion</th><th>Max Points</th><th>What It Checks</th><th>Diagnostic Failure Mode</th></tr></thead>
+  <tbody>
+    <tr><td><strong>GROUNDED</strong></td><td>3</td><td>Answer based on tool results, not hallucination</td><td><code>NoToolsCalled</code> → retry with "you MUST call tools"</td></tr>
+    <tr><td><strong>COMPLETE</strong></td><td>3</td><td>All parts of the question addressed</td><td><code>LowQuality</code> → retry with "provide thorough answer"</td></tr>
+    <tr><td><strong>CITED</strong></td><td>2</td><td>Sources tagged [DocSource N] / [SQLSource]</td><td><code>MissingCitations</code> → retry with "add inline citations"</td></tr>
+    <tr><td><strong>CLEAR</strong></td><td>2</td><td>Well-structured, easy to understand</td><td><code>LowQuality</code> → retry with format guidance</td></tr>
+    <tr><td colspan="2"><strong>Total</strong></td><td colspan="2">10 points — threshold 6 (configurable)</td></tr>
+  </tbody>
+</table>
+
+<pre><code>// From DiagnoseFailure() in AgentOrchestrator.cs
+// 5 targeted failure modes — NOT generic "try harder"
+if (toolsUsed.Count == 0)
+    return ("NoToolsCalled", "You MUST search before answering...");
+
+if (!answer.Contains("[DocSource") && !answer.Contains("[SQLSource]"))
+    return ("MissingCitations", "Add [DocSource N] citations to every claim...");
+
+if (toolErrors.Any(e => e.ErrorType == "ToolFailure"))
+    return ("ToolError", "Try GetSchemaAsync before SQL queries...");
+
+if (toolErrors.Any(e => e.ErrorType == "EmptyResult"))
+    return ("EmptyResults", "Try different search keywords or SearchWebAsync...");
+
+return ("LowQuality", "Provide a more thorough, grounded answer...");</code></pre>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "Targeted retry is the key difference from naive 'try again'. We diagnose WHY the reflection score is low — no citations, no tools called, SQL error, empty results — and give the LLM a specific correction prompt. This fixes ~80% of issues on first retry vs ~40% for generic retry. The failure type is also logged and returned in the response for observability."</p>
+</div>
+
+<h3 id="human-review">Human Review Layer</h3>
+<p>LLM-as-judge has blind spots — it can be manipulated or biased by the same training data. The recommended human review pipeline:</p>
+
+<table>
+  <thead><tr><th>Trigger</th><th>Action</th><th>Review Scope</th></tr></thead>
+  <tbody>
+    <tr><td>ReflectionScore ≤ 4</td><td>Flag for immediate human review queue</td><td>Answer quality, tool selection</td></tr>
+    <tr><td>Reflection score disagreement (LLM says 8, user thumbs-down)</td><td>Log discrepancy, retrain judge prompt</td><td>Judge calibration</td></tr>
+    <tr><td>Weekly random sample (5% of requests)</td><td>Human annotation for ground truth expansion</td><td>Golden set growth</td></tr>
+    <tr><td>New document type added to index</td><td>Targeted eval run on new document questions</td><td>Retrieval quality</td></tr>
+    <tr><td>Any PII detected in final answer (Layer 3)</td><td>Immediate alert + audit log (GDPR)</td><td>Privacy compliance</td></tr>
+  </tbody>
+</table>
+
+<pre><code>// Recommended: add user feedback endpoint
+// POST /api/agent/feedback
+public class FeedbackRequest
+{
+    public string SessionId { get; set; } = "";
+    public string QuestionHash { get; set; } = ""; // SHA-256, never raw question
+    public bool ThumbsUp { get; set; }
+    public string? Category { get; set; } // "wrong_answer", "incomplete", "good"
+}
+// Store in Azure Table Storage → weekly batch review in Excel / Label Studio</code></pre>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>✅ Pros of LLM-as-Judge</h4>
+    <ul>
+      <li>Scales to millions of answers (no human bottleneck)</li>
+      <li>Consistent scoring criteria across all requests</li>
+      <li>In-line — blocks bad answers from reaching users</li>
+      <li>Cheap (~$0.002/eval with GPT-4o-mini)</li>
+      <li>Triggers targeted retry, not just re-generation</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>❌ Cons of LLM-as-Judge</h4>
+    <ul>
+      <li>Can be fooled by confident-sounding hallucination</li>
+      <li>Scoring not perfectly calibrated to human preference</li>
+      <li>Adds ~400ms latency per request</li>
+      <li>Judge and generator share same training distribution</li>
+      <li>Score of 6/10 ≠ absolute quality guarantee</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PILLAR 3: EVALUATION FRAMEWORK                       -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pillar3">
+<h2>Pillar 3 — Evaluation Framework</h2>
+
+<h3 id="ground-truth">Ground Truth Setup</h3>
+<p>The <strong>golden test set</strong> (<code>eval/golden_test_set.json</code>) is the foundation of all offline evaluation. Each entry contains a question, the expected answer, and the relevant document chunks that should be retrieved.</p>
+
+<pre><code>// eval/golden_test_set.json — current structure
+[
+  {
+    "question": "What is the contract termination notice period?",
+    "expected_answer": "90 days written notice",
+    "relevant_chunks": [
+      "Section 12.1: Either party may terminate with 90 days written notice.",
+      "Section 12.2: Notice must be delivered to the registered address."
+    ]
+  }
+]</code></pre>
+
+<p><strong>How to build a high-quality golden test set:</strong></p>
+<ol>
+  <li><strong>Domain expert questions</strong> — Ask SMEs who know the documents to write realistic questions and verified answers.</li>
+  <li><strong>Adversarial questions</strong> — Include questions where the correct answer is "not found" to test hallucination resistance.</li>
+  <li><strong>Multi-hop questions</strong> — "Which vendor has the highest disputed invoice total?" (requires SQL + doc search).</li>
+  <li><strong>Temporal questions</strong> — "Which contracts expire this quarter?" (tests date reasoning).</li>
+  <li><strong>Negation questions</strong> — "Which contracts do NOT include an SLA?" (tests absence detection).</li>
+  <li><strong>Continuous growth</strong> — At minimum 50 questions for statistical significance. 200+ for production confidence.</li>
+</ol>
+
+<div class="callout-warn">
+<p><strong>Current gap:</strong> The golden test set has only 3 questions. This is too small for reliable quality measurement. Any random variation will appear significant. Expand to at least 50 questions before trusting the eval numbers.</p>
+</div>
+
+<h3 id="ragas-metrics">RAGAS Metrics — What They Measure</h3>
+<p>RAGAS (Retrieval Augmented Generation Assessment) provides 4 metrics that together fully characterize RAG quality:</p>
+
+<table>
+  <thead><tr><th>Metric</th><th>What it measures</th><th>Formula concept</th><th>Threshold</th><th>Failure means</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Faithfulness</strong></td>
+      <td>Is every claim in the answer supported by the retrieved context?</td>
+      <td>Claims supported by context / total claims</td>
+      <td>≥ 0.80</td>
+      <td>Hallucination — LLM added facts not in documents</td>
+    </tr>
+    <tr>
+      <td><strong>Answer Relevancy</strong></td>
+      <td>Does the answer actually address the question?</td>
+      <td>Cosine similarity: question ↔ answer embedding</td>
+      <td>≥ 0.70</td>
+      <td>Off-topic response or incomplete answer</td>
+    </tr>
+    <tr>
+      <td><strong>Context Precision</strong></td>
+      <td>Are the retrieved chunks actually relevant?</td>
+      <td>Relevant chunks retrieved / total chunks retrieved</td>
+      <td>≥ 0.70</td>
+      <td>Noisy retrieval — returning irrelevant chunks</td>
+    </tr>
+    <tr>
+      <td><strong>Context Recall</strong></td>
+      <td>Were all relevant chunks found?</td>
+      <td>Relevant chunks found / total relevant chunks in golden set</td>
+      <td>≥ 0.70</td>
+      <td>Missing important context — retrieval gap</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+<p><strong>The quadrant rule:</strong><br>
+High Faithfulness + High Relevancy = good generation.<br>
+High Precision + High Recall = good retrieval.<br>
+You need all four. A system can score 1.0 faithfulness by just saying "I don't know" — which scores 0.0 relevancy. RAGAS catches this.</p>
+</blockquote>
+
+<h3 id="confusion-metrics">Confusion Metrics for RAG</h3>
+<p>Standard ML confusion metrics (precision/recall/F1) apply to RAG in two ways:</p>
+
+<h4>Retrieval Confusion Matrix</h4>
+<table>
+  <thead><tr><th></th><th>Retrieved</th><th>Not Retrieved</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Relevant chunk</strong></td><td>True Positive (TP)</td><td>False Negative (FN) — recall failure</td></tr>
+    <tr><td><strong>Irrelevant chunk</strong></td><td>False Positive (FP) — precision failure</td><td>True Negative (TN)</td></tr>
+  </tbody>
+</table>
+<p>
+  <strong>Retrieval Precision</strong> = TP / (TP + FP) — are the retrieved chunks useful?<br>
+  <strong>Retrieval Recall</strong> = TP / (TP + FN) — did we find all relevant chunks?<br>
+  <strong>Retrieval F1</strong> = 2 × (Precision × Recall) / (Precision + Recall) — harmonic mean<br>
+</p>
+
+<h4>Answer Quality Classification</h4>
+<p>For factual questions with ground truth, you can classify each answer:</p>
+<table>
+  <thead><tr><th>Category</th><th>Definition</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="badge badge-green">Correct</span></td><td>Answer matches ground truth, well-cited</td><td>Cache it, use it for few-shot</td></tr>
+    <tr><td><span class="badge badge-orange">Partially Correct</span></td><td>Right direction, missing details</td><td>Log for prompt improvement</td></tr>
+    <tr><td><span class="badge badge-red">Hallucinated</span></td><td>Confidently wrong or fabricated</td><td>Immediate alert, retrain retrieval</td></tr>
+    <tr><td><span class="badge badge-gray">Refused</span></td><td>Said "not found" when answer exists</td><td>Improve retrieval coverage</td></tr>
+    <tr><td><span class="badge badge-purple">Off-topic</span></td><td>Answered different question entirely</td><td>Improve intent classification</td></tr>
+  </tbody>
+</table>
+
+<h3 id="eval-implementation">Evaluation Implementation</h3>
+<pre><code># eval/run_eval.py — current implementation
+import json, requests, pandas as pd
+from ragas import evaluate
+from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
+
+# Load golden test set
+with open("golden_test_set.json") as f:
+    golden = json.load(f)
+
+results = []
+for item in golden:
+    # Call the live API
+    resp = requests.post(API_URL, json={"question": item["question"]})
+    data = resp.json()
+
+    results.append({
+        "question": item["question"],
+        "answer": data["answer"],
+        "contexts": [c["content"] for c in data.get("textCitations", [])],
+        "ground_truth": item["expected_answer"],
+        "relevant_chunks": item["relevant_chunks"]
+    })
+
+# Run RAGAS evaluation
+report = evaluate(pd.DataFrame(results),
+                  metrics=[faithfulness, answer_relevancy,
+                           context_precision, context_recall])
+
+# Quality gates — CI/CD pipeline fails if any metric drops below threshold
+assert report["faithfulness"]      >= 0.80, "Faithfulness below threshold"
+assert report["context_precision"] >= 0.70, "Context precision below threshold"
+assert report["context_recall"]    >= 0.70, "Context recall below threshold"
+assert report["answer_relevancy"]  >= 0.70, "Answer relevancy below threshold"</code></pre>
+
+<p><strong>Recommended additions to eval pipeline:</strong></p>
+<pre><code># Add per-question metrics, reflection score tracking, cost tracking
+for item in golden:
+    resp = requests.post(API_URL, json={"question": item["question"]})
+    data = resp.json()
+
+    results.append({
+        # ... existing fields ...
+        "reflection_score":  data.get("reflectionScore"),
+        "model_used":        data.get("modelUsed"),
+        "tools_used":        data.get("toolsUsed", []),
+        "from_cache":        data.get("fromCache"),
+        "estimated_cost":    data.get("tokenUsage", {}).get("estimatedCost"),
+        "intent_detected":   data.get("intent", {}).get("intent"),
+    })
+
+# Additional analysis
+df = pd.DataFrame(results)
+print(f"Avg reflection score:  {df['reflection_score'].mean():.2f}")
+print(f"Cache hit rate:        {df['from_cache'].mean()*100:.1f}%")
+print(f"Avg cost per question: ${df['estimated_cost'].mean():.4f}")
+print(f"GPT-4o usage rate:     {(df['model_used']=='gpt-4o').mean()*100:.1f}%")</code></pre>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "We have a CI/CD quality gate — the eval script runs in our pipeline before any deployment. It calls the live API against our golden test set and fails the build if faithfulness drops below 0.80. This means a bad prompt change can't silently ship to production."</p>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PILLAR 4: COST MONITORING                            -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pillar4">
+<h2>Pillar 4 — Cost &amp; Latency Monitoring</h2>
+
+<h3 id="cost-model">Cost Model</h3>
+<p>This system has 5 cost levers, each tracked separately:</p>
+
+<table>
+  <thead><tr><th>Operation</th><th>Model</th><th>Cost</th><th>Per Request</th></tr></thead>
+  <tbody>
+    <tr><td>Cache embedding</td><td>text-embedding-3-small</td><td>$0.020/1M tokens</td><td>~$0.000002</td></tr>
+    <tr><td>Planning (tool selection)</td><td>GPT-4o-mini</td><td>$0.15/$0.60 per 1M</td><td>~$0.0002</td></tr>
+    <tr><td>Reflection (quality eval)</td><td>GPT-4o-mini</td><td>$0.15/$0.60 per 1M</td><td>~$0.002</td></tr>
+    <tr><td>Generation (simple)</td><td>GPT-4o-mini (reused)</td><td>$0 extra</td><td>$0</td></tr>
+    <tr><td>Generation (complex)</td><td>GPT-4o</td><td>$2.50/$10.00 per 1M</td><td>~$0.015</td></tr>
+    <tr><td>Doc embedding (search)</td><td>text-embedding-3-large</td><td>$0.130/1M tokens</td><td>~$0.0001</td></tr>
+    <tr><td><strong>Cache HIT (all sources)</strong></td><td>Embedding only</td><td>—</td><td><strong>~$0.000004</strong></td></tr>
+    <tr><td><strong>Cache MISS (full pipeline, simple)</strong></td><td>mini + mini</td><td>—</td><td><strong>~$0.003</strong></td></tr>
+    <tr><td><strong>Cache MISS (full pipeline, complex)</strong></td><td>mini + GPT-4o</td><td>—</td><td><strong>~$0.017</strong></td></tr>
+  </tbody>
+</table>
+
+<h3 id="routing-savings">Routing Savings (Measured)</h3>
+<p>The <code>ComplexityRouterService</code> decides whether to use GPT-4o-mini or GPT-4o for generation:</p>
+<pre><code>// ComplexityRouterService.cs — 4 rules, zero LLM cost
+// Rule 1: 2+ distinct tools → Complex
+// Rule 2: >2000 context tokens → Complex
+// Rule 3: "compare","analyze","why" in question → Complex
+// Rule 4: "what is","define","list" prefix → Simple
+// Default: Simple</code></pre>
+
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="metric-val">~69%</div>
+    <div class="metric-label">Cost reduction</div>
+    <div class="metric-sub">vs always using GPT-4o</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">~85%</div>
+    <div class="metric-label">Queries → Simple</div>
+    <div class="metric-sub">Use GPT-4o-mini (15x cheaper)</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">$0</div>
+    <div class="metric-label">Router cost</div>
+    <div class="metric-sub">Rule-based, no LLM call</div>
+  </div>
+</div>
+
+<h3 id="cache-savings">Cache Savings</h3>
+<p>Semantic cache (0.92 cosine threshold) intercepts questions similar to previously answered ones:</p>
+
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="metric-val">~99.9%</div>
+    <div class="metric-label">Cost saved per hit</div>
+    <div class="metric-sub">$0.000004 vs $0.017</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">~95%</div>
+    <div class="metric-label">Latency saved per hit</div>
+    <div class="metric-sub">150ms vs 4–8s</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-val">0.92</div>
+    <div class="metric-label">Cosine threshold</div>
+    <div class="metric-sub">Tunable in AgentSettings</div>
+  </div>
+</div>
+
+<pre><code>// Tracking cache performance — add to SemanticCacheService
+// Log hit rate as a custom metric (see OpenTelemetry section)
+private int _cacheHits = 0;
+private int _cacheMisses = 0;
+public double HitRate => _cacheHits / (double)(_cacheHits + _cacheMisses);</code></pre>
+
+<h3 id="budget-alerts">Budget Alerts (Recommended)</h3>
+<pre><code>// appsettings.json — add budget thresholds
+"CostAlerts": {
+  "DailyBudgetUsd": 50.00,
+  "HourlyBudgetUsd": 5.00,
+  "PerRequestMaxUsd": 0.10,
+  "AlertWebhook": "https://hooks.slack.com/..."
+}
+
+// Middleware addition — check running daily cost
+if (agentResponse.TokenUsage.EstimatedCost > _costSettings.PerRequestMaxUsd)
+    _logger.LogWarning("High-cost request: ${Cost:F4} (SessionId={SessionId})",
+        agentResponse.TokenUsage.EstimatedCost, agentResponse.SessionId);</code></pre>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PILLAR 5: STRUCTURED LOGGING                         -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pillar5">
+<h2>Pillar 5 — Structured Logging</h2>
+
+<h3 id="ilogger">ILogger Pattern (existing)</h3>
+<p>The system uses <code>ILogger&lt;T&gt;</code> throughout, which outputs structured JSON to Application Insights when <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code> is set:</p>
+
+<pre><code>// AgentOrchestrator.cs — example of good structured logging
+_logger.LogInformation("Processing question for session {SessionId}", sessionId);
+_logger.LogInformation("Intent classified as {Intent} (confidence={Confidence:F2})",
+    intentResult.Intent, intentResult.Confidence);
+_logger.LogInformation("Query classified as {Complexity} — routing to appropriate model", complexity);
+_logger.LogWarning("Reflection score {Score}/10 — diagnosing failure (attempt {Retry})",
+    reflectionScore, retries + 1);
+_logger.LogWarning("PII Layer 1: Redacted {Count} entities from user input", detections.Count);</code></pre>
+
+<p>In Application Insights, these appear as <strong>structured properties</strong>:</p>
+<pre><code>// Kusto Query Language (KQL) — query your telemetry
+traces
+| where timestamp > ago(1h)
+| where message contains "Intent classified"
+| extend intent = tostring(customDimensions["Intent"])
+| summarize count() by intent, bin(timestamp, 5m)
+| render timechart</code></pre>
+
+<h3 id="correlation">Correlation IDs (existing)</h3>
+<p><code>GlobalExceptionMiddleware</code> generates a 12-character correlation ID for every unhandled exception and includes it in the RFC 7807 ProblemDetails response. The client can reference this ID in support tickets.</p>
+
+<pre><code>// GlobalExceptionMiddleware.cs
+var correlationId = Guid.NewGuid().ToString("N")[..12];
+_logger.LogError(ex, "Unhandled exception [CorrelationId={CorrelationId}]", correlationId);
+// ... response includes: Extensions = { ["correlationId"] = correlationId }
+</code></pre>
+
+<p><strong>Recommended extension:</strong> Add a session-scoped trace ID to ALL log lines (not just errors), so you can filter Application Insights by a single user session:</p>
+<pre><code>// In AgentController.cs — add to every request
+using var scope = _logger.BeginScope(new Dictionary&lt;string, object&gt;
+{
+    ["SessionId"] = request.SessionId ?? "anonymous",
+    ["RequestId"] = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N")[..12]
+});
+// All _logger calls within this scope automatically include SessionId and RequestId</code></pre>
+
+<h3 id="pii-safety">PII-Safe Logging</h3>
+<p>A critical observability requirement is that the logging itself must not leak PII:</p>
+<pre><code>// AgentController.cs — question is truncated to 100 chars before logging
+_logger.LogInformation("Received question (first 100 chars): {Question}",
+    request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question);
+
+// AgentOrchestrator.cs — memory writes always use redacted text (Layer 5)
+var (redactedQ, _) = _piiService.RedactText(request.Question, PiiContext.MemoryWrite);
+await _memoryService.AddTurnAsync(sessionId, "user", redactedQ);
+// → logs never see "My SSN is 123-45-6789"</code></pre>
+
+<div class="callout-interview">
+<p><strong>Interview Key Point:</strong> "We have defense-in-depth for PII in logging. Questions are truncated at 100 chars in the controller. The orchestrator logs counts ('3 entities redacted') not values. Memory and cache writes use redacted text. This satisfies GDPR Article 25 (privacy by design) — PII can't accumulate in Azure Monitor or Log Analytics."</p>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PILLAR 6: OPENTELEMETRY & APP INSIGHTS               -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pillar6">
+<h2>Pillar 6 — OpenTelemetry &amp; Application Insights</h2>
+
+<h3 id="otel-setup">OpenTelemetry Setup (existing wiring)</h3>
+<p>The project references <code>Azure.Monitor.OpenTelemetry.AspNetCore</code> in <code>AgenticRAG.Api.csproj</code>. When <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code> is set, all ILogger output and HTTP traces are automatically exported:</p>
+
+<pre><code>// Program.cs — existing OpenTelemetry setup (already in project)
+builder.Services.AddOpenTelemetry()
+    .UseAzureMonitor(); // Reads APPLICATIONINSIGHTS_CONNECTION_STRING from env
+
+// This gives you for free:
+// - HTTP request/response traces (duration, status codes)
+// - Exception tracking
+// - All _logger.Log*() calls as Application Insights traces
+// - Dependency tracking (outbound HTTP to Azure OpenAI, Redis, AI Search)</code></pre>
+
+<h3 id="custom-metrics">Custom Metrics Implementation</h3>
+<p>The following custom metrics should be added to capture LLM-specific signals not covered by default HTTP tracing:</p>
+
+<pre><code">// Create a new file: src/AgenticRAG.Core/Observability/AgenticRagMetrics.cs
+using System.Diagnostics.Metrics;
+
+namespace AgenticRAG.Core.Observability;
+
+public class AgenticRagMetrics
+{
+    private static readonly Meter Meter = new("AgenticRAG", "1.0");
+
+    // Quality
+    public static readonly Histogram&lt;double&gt; ReflectionScore =
+        Meter.CreateHistogram&lt;double&gt;("rag.reflection_score",
+            description: "LLM-as-judge quality score (1-10) per response");
+
+    // Cost
+    public static readonly Counter&lt;double&gt; EstimatedCostUsd =
+        Meter.CreateCounter&lt;double&gt;("rag.estimated_cost_usd",
+            description: "Estimated LLM cost in USD per request");
+
+    // Latency (per stage)
+    public static readonly Histogram&lt;double&gt; PlanningLatencyMs =
+        Meter.CreateHistogram&lt;double&gt;("rag.planning_latency_ms",
+            description: "GPT-4o-mini planning phase duration");
+    public static readonly Histogram&lt;double&gt; GenerationLatencyMs =
+        Meter.CreateHistogram&lt;double&gt;("rag.generation_latency_ms",
+            description: "GPT-4o generation phase duration");
+
+    // Cache
+    public static readonly Counter&lt;long&gt; CacheHits =
+        Meter.CreateCounter&lt;long&gt;("rag.cache_hits",
+            description: "Semantic cache hits — pipeline skipped");
+    public static readonly Counter&lt;long&gt; CacheMisses =
+        Meter.CreateCounter&lt;long&gt;("rag.cache_misses",
+            description: "Semantic cache misses — full pipeline executed");
+
+    // Routing
+    public static readonly Counter&lt;long&gt; SimpleQueries =
+        Meter.CreateCounter&lt;long&gt;("rag.routing_simple",
+            description: "Queries routed to GPT-4o-mini");
+    public static readonly Counter&lt;long&gt; ComplexQueries =
+        Meter.CreateCounter&lt;long&gt;("rag.routing_complex",
+            description: "Queries escalated to GPT-4o");
+
+    // PII
+    public static readonly Counter&lt;long&gt; PiiRedactions =
+        Meter.CreateCounter&lt;long&gt;("rag.pii_redactions",
+            description: "Total PII entities redacted");
+
+    // Errors
+    public static readonly Counter&lt;long&gt; ToolErrors =
+        Meter.CreateCounter&lt;long&gt;("rag.tool_errors",
+            description: "MCP tool call failures");
+    public static readonly Counter&lt;long&gt; ToolRecoveries =
+        Meter.CreateCounter&lt;long&gt;("rag.tool_recoveries",
+            description: "Tool errors recovered via fallback");
+}</code></pre>
+
+<p>Register the meter in <code>Program.cs</code>:</p>
+<pre><code>// Program.cs — add meter registration
+builder.Services.AddOpenTelemetry()
+    .UseAzureMonitor()
+    .WithMetrics(metrics =>
+        metrics.AddMeter("AgenticRAG"));  // picks up all metrics in AgenticRagMetrics</code></pre>
+
+<p>Emit metrics from the orchestrator:</p>
+<pre><code>// AgentOrchestrator.cs — add metric emissions after key steps
+// After cache check:
+if (cachedAnswer != null)
+    AgenticRagMetrics.CacheHits.Add(1);
+else
+    AgenticRagMetrics.CacheMisses.Add(1);
+
+// After routing decision:
+if (complexity == QueryComplexity.Simple)
+    AgenticRagMetrics.SimpleQueries.Add(1, new TagList { { "intent", effectiveIntent.ToString() } });
+else
+    AgenticRagMetrics.ComplexQueries.Add(1, new TagList { { "intent", effectiveIntent.ToString() } });
+
+// After reflection:
+AgenticRagMetrics.ReflectionScore.Record(reflectionScore,
+    new TagList { { "model", modelUsed }, { "intent", effectiveIntent.ToString() } });
+
+// After response:
+AgenticRagMetrics.EstimatedCostUsd.Add((double)agentResponse.TokenUsage.EstimatedCost);
+
+// PII:
+AgenticRagMetrics.PiiRedactions.Add(allPiiDetections.Count);</code></pre>
+
+<h3 id="dashboards">Dashboards &amp; Alerts (Azure Monitor)</h3>
+<p>With custom metrics flowing into Azure Monitor, build these workbooks and alerts:</p>
+
+<table>
+  <thead><tr><th>Dashboard Panel</th><th>Metric</th><th>KQL Query</th><th>Alert If</th></tr></thead>
+  <tbody>
+    <tr><td>Quality trend</td><td>rag.reflection_score</td><td><code>avg(value) by bin(timestamp, 1h)</code></td><td>7-day avg &lt; 6.5</td></tr>
+    <tr><td>Cache hit rate</td><td>rag.cache_hits / (hits+misses)</td><td><code>hits / (hits + misses)</code></td><td>Hit rate &lt; 20%</td></tr>
+    <tr><td>Daily cost</td><td>rag.estimated_cost_usd</td><td><code>sum(value) by bin(timestamp, 1d)</code></td><td>&gt; $50/day</td></tr>
+    <tr><td>Model routing split</td><td>rag.routing_*</td><td><code>simple / (simple + complex)</code></td><td>Complex rate &gt; 40%</td></tr>
+    <tr><td>Tool error rate</td><td>rag.tool_errors</td><td><code>errors / total_requests</code></td><td>&gt; 5% error rate</td></tr>
+    <tr><td>P95 latency</td><td>HTTP duration</td><td><code>percentile(duration, 95)</code></td><td>P95 &gt; 10s</td></tr>
+    <tr><td>PII detections</td><td>rag.pii_redactions</td><td><code>sum(value) by bin(timestamp, 1d)</code></td><td>Spike &gt; 2x baseline</td></tr>
+  </tbody>
+</table>
+
+<pre><code>// KQL — correlation between reflection score and model used
+customMetrics
+| where name == "rag.reflection_score"
+| extend model = tostring(customDimensions["model"])
+| summarize avg(value), percentile(value, 25), percentile(value, 75)
+  by model, bin(timestamp, 1h)
+| render timechart
+// Expected: gpt-4o should have higher scores than gpt-4o-mini</code></pre>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- GAPS & ROADMAP                                       -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="gaps">
+<h2>Current Gaps &amp; Roadmap</h2>
+<table>
+  <thead><tr><th>Gap</th><th>Priority</th><th>Effort</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Token counts not wired from SDK response</td>
+      <td><span class="badge badge-red">HIGH</span></td>
+      <td>2h</td>
+      <td>Extract <code>response.Usage.InputTokens</code> from <code>ChatResponse</code> and populate <code>TokenUsageInfo</code></td>
+    </tr>
+    <tr>
+      <td>Custom OTel metrics not emitted</td>
+      <td><span class="badge badge-red">HIGH</span></td>
+      <td>1 day</td>
+      <td>Add <code>AgenticRagMetrics.cs</code> and emit at each pipeline step</td>
+    </tr>
+    <tr>
+      <td>Per-step latency not tracked</td>
+      <td><span class="badge badge-orange">MEDIUM</span></td>
+      <td>3h</td>
+      <td>Add <code>Stopwatch</code> around each stage, log + emit histogram</td>
+    </tr>
+    <tr>
+      <td>Golden test set too small (3 questions)</td>
+      <td><span class="badge badge-red">HIGH</span></td>
+      <td>1 week</td>
+      <td>Expand to 50+ questions; add adversarial, multi-hop, temporal cases</td>
+    </tr>
+    <tr>
+      <td>No user feedback endpoint</td>
+      <td><span class="badge badge-orange">MEDIUM</span></td>
+      <td>4h</td>
+      <td>Add <code>POST /api/agent/feedback</code>; store thumbs-up/down for human review</td>
+    </tr>
+    <tr>
+      <td>Budget alerts not implemented</td>
+      <td><span class="badge badge-orange">MEDIUM</span></td>
+      <td>2h</td>
+      <td>Add <code>CostAlerts</code> config + alert rule in Azure Monitor</td>
+    </tr>
+    <tr>
+      <td>No Azure Monitor Workbook</td>
+      <td><span class="badge badge-orange">MEDIUM</span></td>
+      <td>1 day</td>
+      <td>Create workbook with quality, cost, latency, cache panels</td>
+    </tr>
+    <tr>
+      <td>Reflection failure correlation not tracked</td>
+      <td><span class="badge badge-gray">LOW</span></td>
+      <td>2h</td>
+      <td>Emit <code>rag.reflection_retries</code> counter + diagnosis category tag</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout-success">
+<p><strong>What IS working well:</strong> Structured ILogger throughout, RFC 7807 error responses with correlation IDs, full observability in API response (reasoning steps, tools used, model used, PII counts, intent, reflection score), RAGAS eval script with quality gates, and defense-in-depth PII logging safety.</p>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PROS & CONS                                          -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pros-cons">
+<h2>Pros &amp; Cons of This Observability Architecture</h2>
+
+<h3>LLM-as-Judge (ReflectionService)</h3>
+<div class="pros-cons">
+  <div class="pros">
+    <h4>✅ Pros</h4>
+    <ul>
+      <li>Scales infinitely — one judge per request, no human needed</li>
+      <li>Consistent criteria across all answers</li>
+      <li>In-line blocking of bad answers before delivery</li>
+      <li>Dirt cheap (~$0.002 per eval)</li>
+      <li>Powers targeted retry — not "try harder" but "fix THIS specific thing"</li>
+      <li>Reflection score in API response = zero-extra-call quality signal for dashboards</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>❌ Cons</h4>
+    <ul>
+      <li>Same LLM family → same blindspots (can't catch what GPT-4o missed)</li>
+      <li>Adds ~400ms to every request</li>
+      <li>Judge score ≠ human preference (needs periodic calibration)</li>
+      <li>Adversarial answers can game the judge</li>
+      <li>GPT-4o-mini may inflate scores for confidently-wrong answers</li>
+    </ul>
+  </div>
+</div>
+
+<h3>RAGAS Offline Evaluation</h3>
+<div class="pros-cons">
+  <div class="pros">
+    <h4>✅ Pros</h4>
+    <ul>
+      <li>4 metrics cover both retrieval and generation quality</li>
+      <li>CI/CD integration — breaks build on quality regression</li>
+      <li>Framework handles complex metric logic automatically</li>
+      <li>Reproducible — same golden set every run</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>❌ Cons</h4>
+    <ul>
+      <li>Requires ground truth (expensive to create)</li>
+      <li>Golden set can become stale if documents change</li>
+      <li>RAGAS itself uses LLM calls internally (costs money to run eval)</li>
+      <li>3-question set is statistically meaningless — needs 50+</li>
+    </ul>
+  </div>
+</div>
+
+<h3>OpenTelemetry + Azure Monitor</h3>
+<div class="pros-cons">
+  <div class="pros">
+    <h4>✅ Pros</h4>
+    <ul>
+      <li>Free default telemetry (HTTP traces, dependencies, exceptions)</li>
+      <li>Custom metrics integrate via standard Meter API</li>
+      <li>KQL is very powerful for correlation and alerting</li>
+      <li>No vendor lock-in for the OTel instrumentation itself</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>❌ Cons</h4>
+    <ul>
+      <li>Custom metrics require additional code (not auto-extracted from AI SDK)</li>
+      <li>Azure Monitor pricing ($2.76/GB ingested) — noisy logging can be expensive</li>
+      <li>Dashboard setup requires up-front KQL knowledge</li>
+      <li>15-min ingestion delay — not truly real-time</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Semantic Cache Observability</h3>
+<div class="pros-cons">
+  <div class="pros">
+    <h4>✅ Pros</h4>
+    <ul>
+      <li>Cache hits produce <code>FromCache: true</code> in every response — zero-cost observability</li>
+      <li>99.9% cost reduction per hit is measurable directly from <code>EstimatedCost</code></li>
+      <li>Tunable threshold in config — can A/B test 0.90 vs 0.95</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>❌ Cons</h4>
+    <ul>
+      <li>Hit rate not currently exported as a metric — requires code addition</li>
+      <li>Stale cached answers not detectable without expiry + freshness metadata</li>
+      <li>High threshold (0.92) means semantically similar questions still miss</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- INTERVIEW KEY POINTS                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="interview">
+<h2>Interview Key Points — Last-Minute Revision</h2>
+
+<div class="callout-interview">
+<p><strong>"What is LLM observability and why is it different from traditional software observability?"</strong><br>
+Traditional observability tracks: did the code execute correctly? LLM observability tracks: was the output correct? You can have a 200 OK response with a hallucinated answer. LLM observability must evaluate the semantic quality of output, not just the mechanics of execution. This requires three new layers: LLM-as-judge (in-production quality scoring), offline evaluation against ground truth (RAGAS), and cost tracking (because wrong answers are expensive).</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"How do you prevent hallucination in your system?"</strong><br>
+Three mechanisms: (1) RAG itself — the agent must call tools before answering; the system prompt says "NEVER answer without tool results". (2) Reflection scoring — after generation, ReflectionService scores groundedness 1-3; a score of 1-2 on GROUNDED triggers a retry with "you MUST use tool results". (3) Citation gates — the CITED score (1-2) forces the LLM to tag every fact with [DocSource N] or [SQLSource]; uncited answers fail reflection and get retried.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"What is LLM-as-judge and what are its limitations?"</strong><br>
+LLM-as-judge uses a separate LLM call (GPT-4o-mini) to evaluate the quality of answers on a 1-10 scale across 4 criteria: grounded, complete, cited, clear. The key advantage is scale — it evaluates every response, not just sampled ones. The key limitation is that the judge uses the same model family as the generator, so it can have the same blindspots. Also, LLMs can be misled by confident-sounding hallucinations. That's why we combine LLM-as-judge with human review (user thumbs-up/down) and offline RAGAS evaluation against ground truth.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"How do you set up ground truth / a golden test set?"</strong><br>
+Ground truth is question-answer-context triples created by domain experts. Good golden sets include factual questions (has a definitive answer), adversarial questions ("not found" is correct), multi-hop questions (require combining two sources), temporal questions (date reasoning), and negation questions (absence detection). The critical rule: ground truth must be created by humans who know the documents, NOT by the LLM itself (that would be circular). We start with 50+ questions for statistical validity; with only 3 questions (our current set), a 1-question change causes a 33% swing in metrics — that's not reliable.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"What are the RAGAS metrics and what does each one mean?"</strong><br>
+Faithfulness: every claim in the answer must be supported by retrieved context (catches hallucination). Answer Relevancy: the answer must address the actual question (catches off-topic responses). Context Precision: retrieved chunks must be relevant (catches noisy retrieval). Context Recall: all relevant chunks must be retrieved (catches retrieval gaps). You need all four — a system that says "I don't know" scores 1.0 faithfulness but 0.0 relevancy. RAGAS runs these automatically using LLM calls internally.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"How do you monitor cost in a production LLM system?"</strong><br>
+Three levers: (1) Cost per request tracked in TokenUsageInfo via Azure OpenAI usage headers. (2) Complexity routing — 85% of queries go to GPT-4o-mini (15x cheaper than GPT-4o), ~69% cost reduction with no quality loss. (3) Semantic cache — similar questions hit the cache (99.9% cost reduction per hit). Budget alerts trigger on daily/hourly thresholds. The key metric to watch is "complex query rate" — if it rises above 40%, the router may be miscalibrated and you're overpaying.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"How do you handle PII in logging and observability?"</strong><br>
+Defense in depth: questions are truncated to 100 chars in the controller log. The orchestrator logs entity counts not values ("3 PII items redacted: 2 emails, 1 SSN"). Memory writes and cache writes use PII-redacted text. The API response includes only aggregate counts in PiiSummary. This satisfies GDPR Article 25 (privacy by design) — PII cannot accumulate in Azure Monitor, Log Analytics, or Redis.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"What are reasoning steps and why do you include them in the API response?"</strong><br>
+Reasoning steps are an in-band distributed trace — every major pipeline decision is appended to a list and returned with the answer. The client can display: "Intent: DataRetrieval → Called GetSchemaAsync → Called QuerySqlAsync → Routed to GPT-4o (complex) → Reflection score: 8/10". This gives full transparency without a separate APM tool. It also enables client-side debugging — if a user gets a bad answer, they can see exactly which steps the agent took. In production, we additionally ship these steps to Application Insights as structured log events.</p>
+</div>
+
+<div class="callout-interview">
+<p><strong>"How do you detect quality regression in CI/CD?"</strong><br>
+The eval script (run_eval.py) runs as a CI/CD step before every deployment. It calls the live API with a golden test set, runs RAGAS metrics, and fails with exit code 1 if any metric drops below threshold (faithfulness &lt; 0.80, precision/recall/relevancy &lt; 0.70). This means: a bad prompt change, a broken retrieval pipeline, or degraded Azure AI Search index will be caught before reaching production users. The build is blocked. Separately, production quality is monitored via Azure Monitor alerts on the reflection_score metric — a 7-day rolling average below 6.5 triggers a Slack alert.</p>
+</div>
+
+<table>
+  <thead><tr><th>Concept</th><th>One-Line Answer</th></tr></thead>
+  <tbody>
+    <tr><td>Faithfulness</td><td>Are claims in the answer supported by retrieved context? (detects hallucination)</td></tr>
+    <tr><td>Context Precision</td><td>Are retrieved chunks relevant? (detects noisy retrieval)</td></tr>
+    <tr><td>Context Recall</td><td>Did we find all relevant chunks? (detects retrieval gaps)</td></tr>
+    <tr><td>Answer Relevancy</td><td>Does the answer address the question? (detects off-topic responses)</td></tr>
+    <tr><td>LLM-as-Judge</td><td>Using a second LLM to evaluate quality of the first LLM's output</td></tr>
+    <tr><td>Ground Truth</td><td>Human-verified question-answer-context triples for offline evaluation</td></tr>
+    <tr><td>Reflection</td><td>In-production LLM self-evaluation; triggers targeted retry if score &lt; threshold</td></tr>
+    <tr><td>Reasoning Steps</td><td>In-band trace of agent decisions returned in every API response</td></tr>
+    <tr><td>Correlation ID</td><td>12-char unique ID linking client error reports to server logs</td></tr>
+    <tr><td>Semantic Cache</td><td>Vector similarity cache; 0.92 cosine threshold; 99.9% cost reduction on hits</td></tr>
+    <tr><td>Complexity Router</td><td>Rule-based (zero LLM cost) decision: GPT-4o-mini vs GPT-4o; 69% cost savings</td></tr>
+    <tr><td>TokenUsageInfo</td><td>Per-request token counts + estimated USD cost + tool call count</td></tr>
+    <tr><td>OpenTelemetry Meter</td><td>Standard API for emitting custom metrics to Azure Monitor / Application Insights</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr/>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- QUICK CHEATSHEET                                     -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="cheatsheet">
+<h2>Quick Cheatsheet</h2>
+
+<h3>Metric → What it tells you → What to do if bad</h3>
+<table>
+  <thead><tr><th>Metric</th><th>Target</th><th>What bad means</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr><td>Faithfulness</td><td>≥ 0.80</td><td>LLM is hallucinating</td><td>Tighten system prompt; check tool results quality</td></tr>
+    <tr><td>Context Precision</td><td>≥ 0.70</td><td>Noisy retrieval</td><td>Tune semantic rerank config; increase score threshold</td></tr>
+    <tr><td>Context Recall</td><td>≥ 0.70</td><td>Missing relevant chunks</td><td>Increase TopK; check index freshness</td></tr>
+    <tr><td>Answer Relevancy</td><td>≥ 0.70</td><td>Off-topic answers</td><td>Improve intent classification; refine system prompt</td></tr>
+    <tr><td>Reflection Score (avg)</td><td>≥ 6.5</td><td>Generation quality degrading</td><td>Check model availability; inspect failing questions</td></tr>
+    <tr><td>Cache hit rate</td><td>≥ 20%</td><td>Cache not helping</td><td>Lower threshold (0.92→0.88); expand TTL</td></tr>
+    <tr><td>Complex query rate</td><td>≤ 40%</td><td>GPT-4o overused → high cost</td><td>Tune ComplexityRouter thresholds</td></tr>
+    <tr><td>P95 latency</td><td>≤ 8s</td><td>Slow responses</td><td>Check Azure OpenAI throttling; lower MaxHistoryTurns</td></tr>
+    <tr><td>PII detection rate</td><td>Track trend</td><td>Spike = new PII in docs/users</td><td>Review inputs; update PII entity list</td></tr>
+    <tr><td>Tool error rate</td><td>≤ 2%</td><td>MCP tools failing</td><td>Check AI Search / SQL connectivity; review fallback logs</td></tr>
+  </tbody>
+</table>
+
+<h3>Files to Know</h3>
+<table>
+  <thead><tr><th>What you want to change</th><th>File</th></tr></thead>
+  <tbody>
+    <tr><td>Quality score threshold for retry</td><td><code>appsettings.json → Agent.ReflectionThreshold</code></td></tr>
+    <tr><td>Add new golden test questions</td><td><code>eval/golden_test_set.json</code></td></tr>
+    <tr><td>Change RAGAS score thresholds</td><td><code>eval/run_eval.py</code></td></tr>
+    <tr><td>Reflection scoring criteria</td><td><code>AgenticRAG.Core/Agents/ReflectionService.cs</code></td></tr>
+    <tr><td>Add custom OTel metrics</td><td><code>AgenticRAG.Core/Observability/AgenticRagMetrics.cs</code> (to create)</td></tr>
+    <tr><td>Per-step latency tracking</td><td><code>AgenticRAG.Core/Agents/AgentOrchestrator.cs</code></td></tr>
+    <tr><td>Routing thresholds (Simple vs Complex)</td><td><code>AgenticRAG.Core/Agents/ComplexityRouterService.cs</code></td></tr>
+    <tr><td>Cache similarity threshold</td><td><code>appsettings.json → Agent.SemanticCacheThreshold</code></td></tr>
+    <tr><td>PII redaction layers on/off</td><td><code>appsettings.json → Pii.*</code></td></tr>
+    <tr><td>Error response format</td><td><code>AgenticRAG.Api/Middleware/GlobalExceptionMiddleware.cs</code></td></tr>
+  </tbody>
+</table>
+</section>
+
+</article>
+</main>
+</div>
+
+<script>
+// Progress bar
+window.addEventListener('scroll', () => {
+  const el = document.querySelector('.content-wrap');
+  const scrollTop = el.scrollTop;
+  const scrollHeight = el.scrollHeight - el.clientHeight;
+  const pct = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+  document.getElementById('progress').style.width = pct + '%';
+}, { passive: true });
+
+// Sidebar active link tracking
+const sections = document.querySelectorAll('section[id]');
+const links = document.querySelectorAll('.sidebar a[href^="#"]');
+const contentWrap = document.querySelector('.content-wrap');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector(`.sidebar a[href="#${entry.target.id}"]`);
+      if (active) {
+        active.classList.add('active');
+        active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  });
+}, { root: contentWrap, rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

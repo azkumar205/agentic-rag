@@ -41,6 +41,7 @@ using AgenticRAG.Core.Memory;
 using AgenticRAG.Core.Privacy;
 using AgenticRAG.Core.Tools;
 using Microsoft.Extensions.AI;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenAI.Chat;
 using OpenAI.Embeddings;
 using StackExchange.Redis;
@@ -220,6 +221,15 @@ builder.Services.AddSingleton<QueryRewriteService>();
 builder.Services.AddSingleton<AmbiguityDetectionService>();
 builder.Services.AddSingleton<ClarificationQuestionService>();
 
+// IntentClassifierService: Rule-based intent classification (zero LLM cost).
+// Classifies user questions into 5 categories (FactualLookup, ComparisonAnalysis, ProceduralHowTo,
+// DataRetrieval, GeneralChitchat) to route to intent-specific prompts.
+builder.Services.AddSingleton<IntentClassifierService>();
+
+// PromptTemplateService: Intent-specific system prompts with few-shot examples and CoT.
+// Each intent gets a tailored prompt that tells the LLM exactly what a good answer looks like.
+builder.Services.AddSingleton<PromptTemplateService>();
+
 // AgentOrchestrator: THE BRAIN — coordinates the entire pipeline:
 // Cache check → Memory load → Tool calling → Routing → Generation → Reflection → Cache → Memory
 builder.Services.AddSingleton<AgentOrchestrator>();
@@ -234,6 +244,25 @@ builder.Services.AddSingleton<AgentOrchestrator>();
 builder.Services.AddMcpServer()
     .WithTools<AgenticRagMcpServer>()
     .WithHttpTransport();
+
+// =====================================================================================
+// STEP 6B: OPENTELEMETRY — CONNECT METRICS TO AZURE MONITOR
+// =====================================================================================
+// Azure.Monitor.OpenTelemetry.AspNetCore handles the heavy lifting:
+//   - Collects HTTP request metrics, dependency tracking, and exceptions automatically
+//   - .WithMetrics(m => m.AddMeter("AgenticRAG")) tells OTel to collect OUR custom metrics
+//   - Everything flows to Application Insights as custom metrics (customMetrics table in KQL)
+//
+// HOW IT WORKS:
+//   AgenticRagMetrics.CacheHits.Add(1)  →  OTel collector picks it up  →  Azure Monitor ingests it
+//   In KQL: customMetrics | where name == "agentic_rag.cache.hits"
+//
+// COST: The OTel SDK adds ~2ms overhead per request. Metrics are batched and sent every 60s.
+// INTERVIEW TIP: "We use Azure Monitor OpenTelemetry for automatic HTTP/dependency tracking
+// plus custom metrics from our pipeline. One line wires it all to Application Insights."
+builder.Services.AddOpenTelemetry()
+    .UseAzureMonitor()
+    .WithMetrics(metrics => metrics.AddMeter("AgenticRAG"));
 
 // =====================================================================================
 // STEP 7: STANDARD ASP.NET PLUMBING

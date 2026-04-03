@@ -35,6 +35,7 @@ using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using AgenticRAG.Core.Configuration;
 using AgenticRAG.Core.Models;
+using AgenticRAG.Core.Observability;
 using OpenAI.Embeddings;
 
 namespace AgenticRAG.Core.Caching;

@@ -53,9 +53,19 @@ public class AgentResponse
     public string? ClarificationId { get; set; }                       // Correlates clarification turn
     public ClarificationRequest? ClarificationRequest { get; set; }    // Structured clarification payload
     public QueryRewriteInfo? QueryRewrite { get; set; }                // Observability for rewrite step
+    public IntentInfo? Intent { get; set; }                               // Classified intent + routing decision
     // Similar past questions shown to user when their query is unclear or could be improved.
     // Populated by cache-based suggestion search — zero extra LLM cost.
     public List<string> SuggestedQuestions { get; set; } = new();
+}
+
+// Intent classification result for observability.
+// Shows the frontend: "Intent: DataRetrieval (confidence: 0.85) → SQL-first prompt"
+public class IntentInfo
+{
+    public string Intent { get; set; } = "";         // e.g., "FactualLookup", "DataRetrieval"
+    public double Confidence { get; set; }             // 0-1 confidence score
+    public string Reasoning { get; set; } = "";       // Why this intent was selected
 }
 
 // A reference to a document chunk, SQL result, or web snippet used in the answer.
@@ -120,4 +130,22 @@ public class PiiSummary
     public int TotalRedactions { get; set; }
     public Dictionary<string, int> RedactionsByType { get; set; } = new();   // e.g., {"Email": 2, "SSN": 1}
     public Dictionary<string, int> RedactionsByLayer { get; set; } = new();  // e.g., {"UserInput": 1, "ToolResult": 2}
+}
+
+// =====================================================================================
+// FeedbackRequest — User thumbs up/down on an answer (ground truth for eval)
+// =====================================================================================
+// The frontend sends this after the user rates an answer. We use it to:
+//   1. Emit feedback metrics (positive/negative counters in Azure Monitor)
+//   2. Correlate with reflection scores to validate our self-eval accuracy
+//   3. Build a human-labeled dataset for future fine-tuning and eval improvements
+//
+// Privacy: Uses SessionId (ephemeral) — no user identity is stored.
+// INTERVIEW TIP: "We collect explicit feedback to validate that our reflection scores
+// actually correlate with user satisfaction. If they diverge, we retune the scoring prompt."
+public class FeedbackRequest
+{
+    public string SessionId { get; set; } = "";          // Links feedback to the conversation
+    public bool IsPositive { get; set; }                  // true = thumbs up, false = thumbs down
+    public string? Comment { get; set; }                  // Optional free-text feedback from user
 }
